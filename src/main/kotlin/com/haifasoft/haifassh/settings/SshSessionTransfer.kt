@@ -36,6 +36,7 @@ object SshSessionTransfer {
         it.id = id
         it.name = name
         it.parentId = parentId
+        it.color = color
     }
 
     private fun SshSession.toExport(includeSecrets: Boolean): SshSessionExport {
@@ -50,6 +51,8 @@ object SshSessionTransfer {
             e.authType = authType
             e.privateKeyPath = privateKeyPath
             e.savePassword = savePassword
+            e.iconKey = iconKey
+            e.color = color
             e.jumpHosts = jumpHosts.mapIndexed { index, jump ->
                 JumpHostExport().also { j ->
                     j.host = jump.host
@@ -82,6 +85,7 @@ object SshSessionTransfer {
             SshFolder().also {
                 it.id = UUID.randomUUID().toString()
                 it.name = f.name
+                it.color = f.color
                 folderIdMap[f.id] = it.id
             }
         }
@@ -102,6 +106,8 @@ object SshSessionTransfer {
                 it.authType = s.authType
                 it.privateKeyPath = s.privateKeyPath
                 it.savePassword = s.savePassword
+                it.iconKey = s.iconKey
+                it.color = s.color
                 it.jumpHosts = s.jumpHosts.map { j ->
                     JumpHost().also { h ->
                         h.host = j.host

@@ -26,6 +26,14 @@ class SshSession {
     /** When true, password / passphrase are persisted in PasswordSafe; otherwise prompted each connect. */
     var savePassword: Boolean = true
 
+    /**
+     * Appearance in the session tree. [iconKey] selects one of the built-in
+     * [com.haifasoft.haifassh.ui.SessionIcons] shapes (blank = default).
+     * [color] is an `#RRGGBB` tint applied to the icon and name (blank = default).
+     */
+    var iconKey: String = ""
+    var color: String = ""
+
     @get:XCollection(style = XCollection.Style.v2)
     var jumpHosts: MutableList<JumpHost> = mutableListOf()
 
@@ -42,6 +50,8 @@ class SshSession {
         c.authType = authType
         c.privateKeyPath = privateKeyPath
         c.savePassword = savePassword
+        c.iconKey = iconKey
+        c.color = color
         c.jumpHosts = jumpHosts.map { it.copyOf() }.toMutableList()
         return c
     }

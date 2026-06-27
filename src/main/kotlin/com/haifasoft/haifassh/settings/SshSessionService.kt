@@ -63,6 +63,30 @@ class SshSessionService : PersistentStateComponent<SshSessionState> {
         }
     }
 
+    fun renameSession(id: String, name: String) {
+        findSession(id)?.let {
+            it.name = name
+            fireChanged()
+        }
+    }
+
+    /** Sets a folder's `#RRGGBB` tree color (blank to reset to default). */
+    fun setFolderColor(id: String, color: String) {
+        findFolder(id)?.let {
+            it.color = color
+            fireChanged()
+        }
+    }
+
+    /** Sets a session's appearance in the tree. Pass blank to reset to the default. */
+    fun setSessionAppearance(id: String, iconKey: String, color: String) {
+        findSession(id)?.let {
+            it.iconKey = iconKey
+            it.color = color
+            fireChanged()
+        }
+    }
+
     /** Upserts a session. Caller assigns [SshSession.id] (or leaves blank for a new one). */
     fun upsertSession(session: SshSession): SshSession {
         if (session.id.isBlank()) session.id = UUID.randomUUID().toString()

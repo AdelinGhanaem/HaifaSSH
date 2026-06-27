@@ -7,6 +7,7 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.ui.CollectionListModel
+import com.intellij.ui.ColorPanel
 import com.intellij.ui.JBIntSpinner
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.ToolbarDecorator
@@ -20,7 +21,10 @@ import com.haifasoft.haifassh.model.SshAuthType
 import com.haifasoft.haifassh.model.SshSession
 import com.haifasoft.haifassh.settings.SshCredentialStore
 import com.haifasoft.haifassh.settings.SshSessionService
+import java.awt.FlowLayout
+import javax.swing.JButton
 import javax.swing.JComponent
+import javax.swing.JPanel
 
 /**
  * Create/edit dialog for an [SshSession], including auth, credential storage,
@@ -45,6 +49,20 @@ class SshSessionDialog(
     private val passwordField = JBPasswordField()
     private val passphraseField = JBPasswordField()
     private val savePasswordCheck = JBCheckBox("Store credentials in IDE password safe", session.savePassword)
+
+    private val iconCombo = ComboBox(SessionIcons.choices.toTypedArray()).apply {
+        selectedItem = SessionIcons.choice(session.iconKey)
+        renderer = SimpleListCellRenderer.create<SessionIcons.Choice> { label, value, _ ->
+            label.text = value?.label ?: ""
+            label.icon = value?.icon
+        }
+    }
+    private val colorPanel = ColorPanel().apply {
+        selectedColor = AppearanceColors.parse(session.color)
+    }
+    private val resetColorButton = JButton("Default").apply {
+        addActionListener { colorPanel.selectedColor = null }
+    }
 
     private val jumpModel = CollectionListModel<JumpHostEntry>()
     private val jumpList = JBList(jumpModel).apply {
@@ -89,6 +107,11 @@ class SshSessionDialog(
             .setPreferredSize(JBUI.size(360, 110))
             .createPanel()
 
+        val colorRow = JPanel(FlowLayout(FlowLayout.LEFT, 6, 0)).apply {
+            add(colorPanel)
+            add(resetColorButton)
+        }
+
         return FormBuilder.createFormBuilder()
             .addLabeledComponent("Name:", nameField)
             .addLabeledComponent("Host:", hostField)
@@ -99,6 +122,8 @@ class SshSessionDialog(
             .addLabeledComponent("Private key:", keyPathField)
             .addLabeledComponent("Passphrase:", passphraseField)
             .addComponent(savePasswordCheck)
+            .addLabeledComponent("Icon:", iconCombo)
+            .addLabeledComponent("Color:", colorRow)
             .addLabeledComponentFillVertically("Jump hosts:", jumpPanel)
             .panel
     }
@@ -149,6 +174,8 @@ class SshSessionDialog(
         session.authType = authCombo.selectedItem as SshAuthType
         session.privateKeyPath = keyPathField.text.trim()
         session.savePassword = savePasswordCheck.isSelected
+        session.iconKey = (iconCombo.selectedItem as? SessionIcons.Choice)?.key.orEmpty()
+        session.color = colorPanel.selectedColor?.let { AppearanceColors.toHex(it) } ?: ""
         session.jumpHosts = jumpModel.items.map { it.host }.toMutableList()
 
         val saved = service.upsertSession(session)

@@ -1,6 +1,31 @@
+# ── Gradle ─────────────────────────────────────────────────────────────
 .gradle/
-.intellijPlatform/
 build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ── IntelliJ Platform Gradle Plugin ────────────────────────────────────
+.intellijPlatform/
+
+# ── IntelliJ IDEA / JetBrains IDE project files ────────────────────────
 .idea/
 *.iml
+*.ipr
+*.iws
 out/
+.run/
+
+# ── Kotlin / JVM ───────────────────────────────────────────────────────
+*.class
+.kotlin/
+hs_err_pid*
+replay_pid*
+
+# ── OS / editor cruft ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*~
+*.swp
+
+# ── Local config & secrets (never commit credentials) ──────────────────
+local.properties
+*.local

@@ -36,6 +36,8 @@ class SshSessionExport {
     var authType: SshAuthType = SshAuthType.PASSWORD
     var privateKeyPath: String = ""
     var savePassword: Boolean = true
+    var iconKey: String = ""
+    var color: String = ""
 
     @get:XCollection(style = XCollection.Style.v2)
     var jumpHosts: MutableList<JumpHostExport> = mutableListOf()

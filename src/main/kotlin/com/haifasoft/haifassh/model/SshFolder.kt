@@ -8,4 +8,7 @@ class SshFolder {
     var id: String = ""
     var name: String = "New Folder"
     var parentId: String = ""
+
+    /** `#RRGGBB` tint applied to the folder icon and name in the tree (blank = default). */
+    var color: String = ""
 }

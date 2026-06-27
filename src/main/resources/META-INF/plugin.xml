@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.haifasoft.haifassh</id>
     <name>HaifaSSH - SSH Session Manager</name>
-    <version>0.4.1</version>
+    <version>0.5.0</version>
     <vendor email="a.ganayem@haifasoft.com" url="https://haifasoft.com">HaifaSoft</vendor>
 
     <description><![CDATA[
@@ -19,6 +19,12 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.5.0 — Customize the session tree: pick a per-session <b>icon</b> and a
+                <b>color</b> for sessions and folders (tints the icon and name). <b>Rename</b>
+                any session or folder in place with <b>Shift+F6</b>. <b>Type-to-search</b> the
+                tree to locate a session by name. Right-click for a context menu
+                (Rename, Set Color…, Reset Color, Edit, Delete). Fixed the
+                <em>SSH Sessions</em> tool-window icon showing dimmed/gray in the New UI.</li>
             <li>0.4.1 — Connect to older servers that only offer legacy SHA-1 host keys
                 (re-enables ssh-rsa/ssh-dss as fallbacks), fixing
                 "Algorithm negotiation fail: server_host_key ... serverProposal=ssh-rsa,ssh-dss".</li>

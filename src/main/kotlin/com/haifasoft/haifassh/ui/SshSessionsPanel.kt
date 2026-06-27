@@ -4,6 +4,8 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CustomShortcutSet
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileChooser.FileChooser
@@ -14,11 +16,17 @@ import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.ui.ColorChooser
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.DoubleClickListener
+import com.intellij.ui.PopupHandler
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.ToolbarDecorator
+import com.intellij.ui.TreeSpeedSearch
+import com.intellij.ui.components.JBTextField
 import com.intellij.ui.treeStructure.Tree
+import com.intellij.util.IconUtil
+import com.intellij.util.containers.Convertor
 import com.intellij.util.ui.JBUI
 import com.haifasoft.haifassh.model.SshFolder
 import com.haifasoft.haifassh.model.SshSession
@@ -27,12 +35,21 @@ import com.haifasoft.haifassh.settings.SshSessionService
 import com.haifasoft.haifassh.settings.SshSessionTransfer
 import com.haifasoft.haifassh.terminal.SshTerminalManager
 import java.awt.BorderLayout
+import java.awt.Component
+import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
+import java.util.EventObject
+import javax.swing.AbstractCellEditor
 import javax.swing.BorderFactory
+import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JTree
+import javax.swing.KeyStroke
+import javax.swing.SwingUtilities
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
+import javax.swing.tree.TreeCellEditor
+import javax.swing.tree.TreePath
 import javax.swing.tree.TreeSelectionModel
 
 /**
@@ -46,7 +63,34 @@ class SshSessionsPanel(
 
     private val service = SshSessionService.getInstance()
     private val rootNode = DefaultMutableTreeNode("root")
-    private val treeModel = DefaultTreeModel(rootNode)
+
+    /**
+     * Commits an in-place (Shift+F6) rename. We intentionally do NOT call
+     * `super` — that would replace the node's [SshSession]/[SshFolder] user
+     * object with the raw string. Instead we rename through the service, which
+     * fires a change event and rebuilds the tree.
+     */
+    private val treeModel = object : DefaultTreeModel(rootNode) {
+        override fun valueForPathChanged(path: TreePath, newValue: Any?) {
+            val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return
+            val name = (newValue as? String)?.trim().orEmpty()
+            if (name.isEmpty()) return
+            val obj = node.userObject
+            // Defer so the tree isn't rebuilt while Swing is still finishing the edit.
+            SwingUtilities.invokeLater {
+                when (obj) {
+                    is SshFolder -> {
+                        service.renameFolder(obj.id, name)
+                        selectFolder(obj.id)
+                    }
+                    is SshSession -> {
+                        service.renameSession(obj.id, name)
+                        selectSession(obj.id)
+                    }
+                }
+            }
+        }
+    }
     private val tree = Tree(treeModel)
 
     init {
@@ -55,6 +99,33 @@ class SshSessionsPanel(
         tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
         tree.cellRenderer = SessionTreeCellRenderer()
         tree.emptyText.text = "No SSH sessions yet — click + to add one"
+
+        // In-place rename (Shift+F6). The editor only starts programmatically,
+        // so ordinary clicks never put a node into edit mode.
+        tree.isEditable = true
+        tree.cellEditor = SessionTreeCellEditor()
+        tree.invokesStopCellEditing = true
+
+        // Type-to-find: locate a session/folder by name quickly.
+        TreeSpeedSearch.installOn(
+            tree,
+            true,
+            Convertor { path ->
+                when (val obj = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject) {
+                    is SshFolder -> obj.name
+                    is SshSession -> obj.displayName()
+                    else -> null
+                }
+            },
+        )
+
+        RenameAction().registerCustomShortcutSet(
+            CustomShortcutSet.fromString("shift F6"),
+            tree,
+            parentDisposable,
+        )
+
+        installContextMenu()
 
         object : DoubleClickListener() {
             override fun onDoubleClick(event: MouseEvent): Boolean {
@@ -279,6 +350,71 @@ class SshSessionsPanel(
         return null
     }
 
+    private fun selectFolder(id: String) {
+        val node = findFolderNode(rootNode, id) ?: return
+        val path = TreePath(node.path)
+        tree.selectionPath = path
+        tree.scrollPathToVisible(path)
+    }
+
+    private fun findFolderNode(parent: DefaultMutableTreeNode, id: String): DefaultMutableTreeNode? {
+        for (i in 0 until parent.childCount) {
+            val child = parent.getChildAt(i) as DefaultMutableTreeNode
+            val obj = child.userObject
+            if (obj is SshFolder && obj.id == id) return child
+            findFolderNode(child, id)?.let { return it }
+        }
+        return null
+    }
+
+    // ---- Rename & appearance ----------------------------------------------
+
+    /** Starts in-place editing of the selected node (the Shift+F6 handler). */
+    private fun renameSelected() {
+        val path = tree.selectionPath ?: return
+        val obj = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject
+        if (obj is SshSession || obj is SshFolder) {
+            tree.startEditingAtPath(path)
+        }
+    }
+
+    private fun setColorSelected() {
+        val node = selectedNode() ?: return
+        val current = when (val obj = node.userObject) {
+            is SshFolder -> obj.color
+            is SshSession -> obj.color
+            else -> return
+        }
+        val initial = AppearanceColors.parse(current) ?: AppearanceColors.DEFAULT_SESSION_TINT
+        val chosen = ColorChooser.chooseColor(this, "Choose Color", initial) ?: return
+        val hex = AppearanceColors.toHex(chosen)
+        when (val obj = node.userObject) {
+            is SshFolder -> service.setFolderColor(obj.id, hex)
+            is SshSession -> service.setSessionAppearance(obj.id, obj.iconKey, hex)
+        }
+    }
+
+    private fun resetColorSelected() {
+        when (val obj = selectedNode()?.userObject) {
+            is SshFolder -> service.setFolderColor(obj.id, "")
+            is SshSession -> service.setSessionAppearance(obj.id, obj.iconKey, "")
+        }
+    }
+
+    private fun installContextMenu() {
+        val group = DefaultActionGroup().apply {
+            add(ConnectAction())
+            addSeparator()
+            add(RenameAction())
+            add(SetColorAction())
+            add(ResetColorAction())
+            addSeparator()
+            add(EditAction())
+            add(DeleteAction())
+        }
+        PopupHandler.installPopupMenu(tree, group, "HaifaSshSessionsTreePopup")
+    }
+
     // ---- Toolbar actions ---------------------------------------------------
 
     private inner class ConnectAction : DumbAwareAction(
@@ -356,6 +492,121 @@ class SshSessionsPanel(
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
     }
 
+    private inner class RenameAction : DumbAwareAction(
+        "Rename",
+        "Rename the selected session or folder",
+        null,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = renameSelected()
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = selectedSession() != null || selectedFolder() != null
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    private inner class SetColorAction : DumbAwareAction(
+        "Set Color…",
+        "Pick a color for the selected session or folder",
+        null,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = setColorSelected()
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = selectedSession() != null || selectedFolder() != null
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    private inner class ResetColorAction : DumbAwareAction(
+        "Reset Color",
+        "Restore the default color",
+        null,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = resetColorSelected()
+
+        override fun update(e: AnActionEvent) {
+            val color = selectedSession()?.color ?: selectedFolder()?.color
+            e.presentation.isEnabled = !color.isNullOrBlank()
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    private inner class EditAction : DumbAwareAction(
+        "Edit…",
+        "Edit the selected session or folder",
+        AllIcons.Actions.Edit,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = editSelected()
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = selectedSession() != null || selectedFolder() != null
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    private inner class DeleteAction : DumbAwareAction(
+        "Delete",
+        "Delete the selected session or folder",
+        AllIcons.Actions.GC,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = removeSelected()
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = selectedSession() != null || selectedFolder() != null
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    // ---- In-place rename editor -------------------------------------------
+
+    /**
+     * Edits a node's name in place. [isCellEditable] returns true only for a
+     * null event, so editing starts solely via [renameSelected]/Shift+F6 — never
+     * on a click — keeping double-click-to-connect intact.
+     */
+    private inner class SessionTreeCellEditor : AbstractCellEditor(), TreeCellEditor {
+        private val field = JBTextField()
+
+        init {
+            field.addActionListener { stopCellEditing() }
+            field.registerKeyboardAction(
+                { cancelCellEditing() },
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_FOCUSED,
+            )
+        }
+
+        override fun getTreeCellEditorComponent(
+            tree: JTree,
+            value: Any?,
+            isSelected: Boolean,
+            expanded: Boolean,
+            leaf: Boolean,
+            row: Int,
+        ): Component {
+            field.text = when (val obj = (value as? DefaultMutableTreeNode)?.userObject) {
+                is SshFolder -> obj.name
+                is SshSession -> obj.name.ifBlank { obj.displayName() }
+                else -> ""
+            }
+            SwingUtilities.invokeLater {
+                field.selectAll()
+                field.requestFocusInWindow()
+            }
+            return field
+        }
+
+        override fun getCellEditorValue(): Any = field.text.trim()
+
+        override fun isCellEditable(e: EventObject?): Boolean = e == null
+    }
+
     // ---- Renderer ----------------------------------------------------------
 
     private class SessionTreeCellRenderer : ColoredTreeCellRenderer() {
@@ -371,13 +622,16 @@ class SshSessionsPanel(
             val obj = (value as? DefaultMutableTreeNode)?.userObject
             when (obj) {
                 is SshFolder -> {
-                    icon = AllIcons.Nodes.Folder
-                    append(obj.name)
+                    val color = AppearanceColors.parse(obj.color)
+                    icon = if (color != null) IconUtil.colorize(AllIcons.Nodes.Folder, color) else AllIcons.Nodes.Folder
+                    append(obj.name, nameAttributes(color, selected))
                 }
 
                 is SshSession -> {
-                    icon = HaifaIcons.Session
-                    append(obj.displayName())
+                    val color = AppearanceColors.parse(obj.color)
+                    val tint = color ?: AppearanceColors.DEFAULT_SESSION_TINT
+                    icon = IconUtil.colorize(SessionIcons.icon(obj.iconKey), tint)
+                    append(obj.displayName(), nameAttributes(color, selected))
                     val target = buildString {
                         append("  ")
                         if (obj.username.isNotBlank()) append("${obj.username}@")
@@ -391,5 +645,13 @@ class SshSessionsPanel(
                 else -> append(obj?.toString() ?: "")
             }
         }
+
+        /** Colored name when the user picked a color (and the row isn't selected, for contrast). */
+        private fun nameAttributes(color: java.awt.Color?, selected: Boolean): SimpleTextAttributes =
+            if (color != null && !selected) {
+                SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, color)
+            } else {
+                SimpleTextAttributes.REGULAR_ATTRIBUTES
+            }
     }
 }

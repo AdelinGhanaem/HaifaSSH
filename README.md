@@ -4,9 +4,16 @@ A MobaXterm-style SSH workflow embedded in IntelliJ-based IDEs: organize SSH
 sessions in a folder tree, connect to an interactive terminal in one click, and
 keep credentials in the IDE Password Safe.
 
-## Features (v0.3.0)
+## Features (v0.5.0)
 
 - **Session tree** — folders + sessions in the left-hand *SSH Sessions* tool window.
+- **Customizable appearance** — give each session a built-in **icon** (server, database,
+  cloud, terminal, globe, container, laptop, secure) and a **color**; color folders too.
+  The color tints both the icon and the name in the tree. Set it from the session dialog,
+  or right-click → *Set Color…* / *Reset Color* (works for folders and sessions).
+- **In-place rename** — press **Shift+F6** on any folder or session to rename it right in
+  the tree, just like renaming a symbol; **Esc** cancels.
+- **Quick search** — start typing in the tree to find and jump to a session/folder by name.
 - **Embedded SSH terminals** — double-click a session (or use the ▶ toolbar button)
   to open a real interactive shell (powered by
   [JediTerm](https://github.com/JetBrains/jediterm) + JSch).
@@ -50,7 +57,7 @@ keep credentials in the IDE Password Safe.
 After `buildPlugin`, install this file:
 
 ```
-build/distributions/haifassh-0.3.0.zip
+build/distributions/haifassh-0.5.0.zip
 ```
 
 In the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…**, then select
