@@ -1,0 +1,63 @@
+<idea-plugin>
+    <id>com.haifasoft.haifassh</id>
+    <name>HaifaSSH - SSH Session Manager</name>
+    <version>0.4.1</version>
+    <vendor email="a.ganayem@haifasoft.com" url="https://haifasoft.com">HaifaSoft</vendor>
+
+    <description><![CDATA[
+        <h2>HaifaSSH — SSH session manager for JetBrains IDEs</h2>
+        <p>A MobaXterm-style SSH workflow built into the IDE:</p>
+        <ul>
+            <li><b>Session tree</b> — organize SSH sessions into folders in the <em>SSH Sessions</em> tool window.</li>
+            <li><b>Embedded terminals</b> — double-click a session to open an interactive SSH shell as a tab
+                in the <em>SSH Terminals</em> tool window.</li>
+            <li><b>Secure credentials</b> — passwords and key passphrases are stored in the IDE Password Safe,
+                never in plain-text config.</li>
+            <li><b>Key &amp; jump-host auth</b> — private-key authentication plus chained ProxyJump/bastion hosts.</li>
+        </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <ul>
+            <li>0.4.1 — Connect to older servers that only offer legacy SHA-1 host keys
+                (re-enables ssh-rsa/ssh-dss as fallbacks), fixing
+                "Algorithm negotiation fail: server_host_key ... serverProposal=ssh-rsa,ssh-dss".</li>
+            <li>0.4.0 — Fixed the first lines of a new terminal rendering in white regardless of theme
+                (the default cell style now follows the active scheme). Colored, non-gray session icon.</li>
+            <li>0.3.0 — Terminal color schemes: ready-made templates (Classic Dark, Solarized,
+                Monokai, One Dark, Light), "Follow IDE Theme", and a fully editable Custom scheme
+                (background, foreground, selection, cursor, 16 ANSI colors) under
+                Settings → Tools → HaifaSSH Terminal. Fixes washed-out dark colors and the
+                black selection block.</li>
+            <li>0.2.0 — Import/export sessions (optionally with credentials); open terminals as editor
+                tabs (toggleable); terminals now follow the IDE dark/light theme.</li>
+            <li>0.1.0 — Initial release: session tree, embedded SSH terminal, key &amp; jump-host support.</li>
+        </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="SSH Sessions"
+                    anchor="left"
+                    icon="/icons/sshSessions.svg"
+                    factoryClass="com.haifasoft.haifassh.ui.SshSessionsToolWindowFactory"/>
+
+        <toolWindow id="SSH Terminals"
+                    anchor="bottom"
+                    canCloseContents="true"
+                    icon="/icons/sshTerminals.svg"
+                    factoryClass="com.haifasoft.haifassh.terminal.SshTerminalsToolWindowFactory"/>
+
+        <notificationGroup id="HaifaSSH" displayType="BALLOON"/>
+
+        <!-- Opens SSH terminals as editor tabs (where source files open). -->
+        <fileEditorProvider implementation="com.haifasoft.haifassh.terminal.editor.SshTerminalFileEditorProvider"/>
+
+        <!-- Settings → Tools → HaifaSSH Terminal: terminal color scheme / templates. -->
+        <applicationConfigurable parentId="tools"
+                                 id="com.haifasoft.haifassh.appearance"
+                                 displayName="HaifaSSH Terminal"
+                                 instance="com.haifasoft.haifassh.ui.TerminalAppearanceConfigurable"/>
+    </extensions>
+</idea-plugin>

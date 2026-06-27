@@ -1,0 +1,50 @@
+package com.haifasoft.haifassh.settings
+
+import com.intellij.credentialStore.CredentialAttributes
+import com.intellij.credentialStore.generateServiceName
+import com.intellij.ide.passwordSafe.PasswordSafe
+
+/**
+ * Stores SSH secrets in the IDE's [PasswordSafe] (OS keychain / KeePass-backed),
+ * keyed by session id so they never touch the serialized session XML.
+ */
+object SshCredentialStore {
+
+    private const val SUBSYSTEM = "HaifaSSH"
+
+    private fun attributes(key: String): CredentialAttributes =
+        CredentialAttributes(generateServiceName(SUBSYSTEM, key))
+
+    private fun passwordKey(sessionId: String) = "$sessionId/password"
+    private fun passphraseKey(sessionId: String) = "$sessionId/passphrase"
+    private fun jumpPasswordKey(sessionId: String, index: Int) = "$sessionId/jump/$index/password"
+    private fun jumpPassphraseKey(sessionId: String, index: Int) = "$sessionId/jump/$index/passphrase"
+
+    fun getPassword(sessionId: String): String? = read(passwordKey(sessionId))
+    fun setPassword(sessionId: String, value: String?) = write(passwordKey(sessionId), value)
+
+    fun getPassphrase(sessionId: String): String? = read(passphraseKey(sessionId))
+    fun setPassphrase(sessionId: String, value: String?) = write(passphraseKey(sessionId), value)
+
+    fun getJumpPassword(sessionId: String, index: Int): String? = read(jumpPasswordKey(sessionId, index))
+    fun setJumpPassword(sessionId: String, index: Int, value: String?) = write(jumpPasswordKey(sessionId, index), value)
+
+    fun getJumpPassphrase(sessionId: String, index: Int): String? = read(jumpPassphraseKey(sessionId, index))
+    fun setJumpPassphrase(sessionId: String, index: Int, value: String?) = write(jumpPassphraseKey(sessionId, index), value)
+
+    /** Removes every secret associated with a session (called on delete). Best-effort up to [maxJumpHosts]. */
+    fun clearSession(sessionId: String, maxJumpHosts: Int = 16) {
+        write(passwordKey(sessionId), null)
+        write(passphraseKey(sessionId), null)
+        for (i in 0 until maxJumpHosts) {
+            write(jumpPasswordKey(sessionId, i), null)
+            write(jumpPassphraseKey(sessionId, i), null)
+        }
+    }
+
+    private fun read(key: String): String? = PasswordSafe.instance.getPassword(attributes(key))
+
+    private fun write(key: String, value: String?) {
+        PasswordSafe.instance.setPassword(attributes(key), value?.takeIf { it.isNotEmpty() })
+    }
+}

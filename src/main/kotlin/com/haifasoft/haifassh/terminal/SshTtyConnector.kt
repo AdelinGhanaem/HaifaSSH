@@ -1,0 +1,46 @@
+package com.haifasoft.haifassh.terminal
+
+import com.jediterm.core.util.TermSize
+import com.jediterm.terminal.TtyConnector
+import com.haifasoft.haifassh.ssh.SshShellHandle
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
+
+/**
+ * Bridges a JediTerm widget to a live SSH shell: JediTerm reads characters and
+ * writes keystrokes through this connector, which proxies to the SSH PTY channel.
+ */
+class SshTtyConnector(
+    private val name: String,
+    private val handle: SshShellHandle,
+) : TtyConnector {
+
+    private val reader = InputStreamReader(handle.inputStream, StandardCharsets.UTF_8)
+    private val output = handle.outputStream
+
+    override fun read(buf: CharArray, offset: Int, length: Int): Int = reader.read(buf, offset, length)
+
+    override fun write(bytes: ByteArray) {
+        output.write(bytes)
+        output.flush()
+    }
+
+    override fun write(string: String) = write(string.toByteArray(StandardCharsets.UTF_8))
+
+    override fun isConnected(): Boolean = handle.isConnected
+
+    override fun resize(termSize: TermSize) = handle.resize(termSize.columns, termSize.rows)
+
+    override fun waitFor(): Int {
+        while (handle.isConnected) {
+            Thread.sleep(100)
+        }
+        return handle.exitStatus()
+    }
+
+    override fun ready(): Boolean = reader.ready()
+
+    override fun getName(): String = name
+
+    override fun close() = handle.close()
+}
