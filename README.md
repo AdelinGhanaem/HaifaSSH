@@ -15,6 +15,9 @@ keep credentials in the IDE Password Safe.
   cloud, terminal, globe, container, laptop, secure) and a **color**; color folders too.
   The color tints both the icon and the name in the tree. Set it from the session dialog,
   or right-click → *Set Color…* / *Reset Color* (works for folders and sessions).
+- **Multi-select bulk edits** — Ctrl/Shift-click to select several sessions (or several
+  folders) and change them together: set the same color, set the same icon (sessions),
+  or delete them all at once. A selection stays to one kind for unambiguous bulk actions.
 - **In-place rename** — press **Shift+F6** on any folder or session to rename it right in
   the tree, just like renaming a symbol; **Esc** cancels.
 - **Quick search** — start typing in the tree to find and jump to a session/folder by name.

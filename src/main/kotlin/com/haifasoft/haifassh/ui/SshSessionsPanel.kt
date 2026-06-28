@@ -96,7 +96,8 @@ class SshSessionsPanel(
     init {
         tree.isRootVisible = false
         tree.showsRootHandles = true
-        tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
+        tree.selectionModel.selectionMode = TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION
+        keepSelectionHomogeneous()
         tree.cellRenderer = SessionTreeCellRenderer()
         tree.emptyText.text = "No SSH sessions yet — click + to add one"
 
@@ -190,12 +191,49 @@ class SshSessionsPanel(
 
     // ---- Selection helpers -------------------------------------------------
 
+    /** The lead (single) selected node — used by single-item actions. */
     private fun selectedNode(): DefaultMutableTreeNode? =
         tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
 
     private fun selectedSession(): SshSession? = selectedNode()?.userObject as? SshSession
 
     private fun selectedFolder(): SshFolder? = selectedNode()?.userObject as? SshFolder
+
+    private fun selectedNodes(): List<DefaultMutableTreeNode> =
+        tree.selectionPaths?.mapNotNull { it.lastPathComponent as? DefaultMutableTreeNode } ?: emptyList()
+
+    private fun selectedSessions(): List<SshSession> = selectedNodes().mapNotNull { it.userObject as? SshSession }
+
+    private fun selectedFolders(): List<SshFolder> = selectedNodes().mapNotNull { it.userObject as? SshFolder }
+
+    /** True when the selection is non-empty and all of one kind (sessions xor folders). */
+    private fun isAllSessions(): Boolean = selectedSessions().isNotEmpty() && selectedFolders().isEmpty()
+    private fun isAllFolders(): Boolean = selectedFolders().isNotEmpty() && selectedSessions().isEmpty()
+
+    /**
+     * Restricts a multi-selection to a single kind: selecting a session clears any
+     * selected folders and vice-versa, so bulk operations always act on one kind
+     * (the user can't mix sessions and folders).
+     */
+    private var adjustingSelection = false
+    private fun keepSelectionHomogeneous() {
+        tree.selectionModel.addTreeSelectionListener {
+            if (adjustingSelection) return@addTreeSelectionListener
+            val paths = tree.selectionPaths ?: return@addTreeSelectionListener
+            if (paths.size < 2) return@addTreeSelectionListener
+            val lead = tree.leadSelectionPath ?: paths.last()
+            val leadIsFolder = (lead.lastPathComponent as? DefaultMutableTreeNode)?.userObject is SshFolder
+            val kept = paths.filter {
+                val obj = (it.lastPathComponent as? DefaultMutableTreeNode)?.userObject
+                if (leadIsFolder) obj is SshFolder else obj is SshSession
+            }
+            if (kept.size != paths.size) {
+                adjustingSelection = true
+                tree.selectionPaths = kept.toTypedArray()
+                adjustingSelection = false
+            }
+        }
+    }
 
     /** Folder a new item should be created in, based on the current selection. */
     private fun targetFolderId(): String = when (val obj = selectedNode()?.userObject) {
@@ -254,25 +292,28 @@ class SshSessionsPanel(
     }
 
     private fun removeSelected() {
-        selectedSession()?.let { session ->
-            val confirm = Messages.showYesNoDialog(
-                project,
-                "Delete session \"${session.displayName()}\"? Its saved credentials will also be removed.",
-                "Delete Session",
-                Messages.getQuestionIcon(),
-            )
-            if (confirm == Messages.YES) service.deleteSession(session.id)
-            return
-        }
-        selectedFolder()?.let { folder ->
-            val confirm = Messages.showYesNoDialog(
-                project,
-                "Delete folder \"${folder.name}\" and everything inside it?",
-                "Delete Folder",
-                Messages.getQuestionIcon(),
-            )
-            if (confirm == Messages.YES) service.deleteFolder(folder.id)
-        }
+        val sessions = selectedSessions()
+        val folders = selectedFolders()
+        if (sessions.isEmpty() && folders.isEmpty()) return
+
+        val what = buildList {
+            if (folders.isNotEmpty()) {
+                add(if (folders.size == 1) "folder \"${folders.first().name}\" (and everything inside)" else "${folders.size} folders (and everything inside)")
+            }
+            if (sessions.isNotEmpty()) {
+                add(if (sessions.size == 1) "session \"${sessions.first().displayName()}\"" else "${sessions.size} sessions")
+            }
+        }.joinToString(" and ")
+
+        val confirm = Messages.showYesNoDialog(
+            project,
+            "Delete $what? Saved credentials will also be removed.",
+            "Delete",
+            Messages.getQuestionIcon(),
+        )
+        if (confirm != Messages.YES) return
+        if (folders.isNotEmpty()) service.deleteFolders(folders.map { it.id })
+        if (sessions.isNotEmpty()) service.deleteSessions(sessions.map { it.id })
     }
 
     private fun connectSelected() {
@@ -390,26 +431,63 @@ class SshSessionsPanel(
         }
     }
 
+    /** Applies one chosen color to every selected session, or every selected folder. */
     private fun setColorSelected() {
-        val node = selectedNode() ?: return
-        val current = when (val obj = node.userObject) {
-            is SshFolder -> obj.color
-            is SshSession -> obj.color
-            else -> return
-        }
+        val sessions = selectedSessions()
+        val folders = selectedFolders()
+        if (sessions.isEmpty() && folders.isEmpty()) return
+
+        val current = sessions.firstOrNull()?.color ?: folders.firstOrNull()?.color ?: ""
         val initial = AppearanceColors.parse(current) ?: AppearanceColors.DEFAULT_SESSION_TINT
         val chosen = ColorChooser.chooseColor(this, "Choose Color", initial) ?: return
         val hex = AppearanceColors.toHex(chosen)
-        when (val obj = node.userObject) {
-            is SshFolder -> service.setFolderColor(obj.id, hex)
-            is SshSession -> service.setSessionAppearance(obj.id, obj.iconKey, hex)
+
+        if (sessions.isNotEmpty()) {
+            val ids = sessions.map { it.id }
+            service.setSessionsColor(ids, hex)
+            reselect(sessionIds = ids)
+        } else {
+            val ids = folders.map { it.id }
+            service.setFoldersColor(ids, hex)
+            reselect(folderIds = ids)
         }
     }
 
     private fun resetColorSelected() {
-        when (val obj = selectedNode()?.userObject) {
-            is SshFolder -> service.setFolderColor(obj.id, "")
-            is SshSession -> service.setSessionAppearance(obj.id, obj.iconKey, "")
+        val sessions = selectedSessions()
+        val folders = selectedFolders()
+        if (sessions.isNotEmpty()) {
+            val ids = sessions.map { it.id }
+            service.setSessionsColor(ids, "")
+            reselect(sessionIds = ids)
+        } else if (folders.isNotEmpty()) {
+            val ids = folders.map { it.id }
+            service.setFoldersColor(ids, "")
+            reselect(folderIds = ids)
+        }
+    }
+
+    /** Applies one chosen icon to every selected session. */
+    private fun setIconSelected() {
+        val sessions = selectedSessions()
+        if (sessions.isEmpty()) return
+        val dialog = IconPickerDialog(project, sessions.first().iconKey)
+        if (dialog.showAndGet()) {
+            val ids = sessions.map { it.id }
+            service.setSessionsIcon(ids, dialog.chosenKey())
+            reselect(sessionIds = ids)
+        }
+    }
+
+    /** Re-selects the given items after a service change rebuilt the tree. */
+    private fun reselect(sessionIds: Collection<String> = emptyList(), folderIds: Collection<String> = emptyList()) {
+        val paths = buildList {
+            sessionIds.forEach { id -> findSessionNode(rootNode, id)?.let { add(TreePath(it.path)) } }
+            folderIds.forEach { id -> findFolderNode(rootNode, id)?.let { add(TreePath(it.path)) } }
+        }
+        if (paths.isNotEmpty()) {
+            tree.selectionPaths = paths.toTypedArray()
+            tree.scrollPathToVisible(paths.first())
         }
     }
 
@@ -419,6 +497,7 @@ class SshSessionsPanel(
             addSeparator()
             add(RenameAction())
             add(SetColorAction())
+            add(SetIconAction())
             add(ResetColorAction())
             addSeparator()
             add(EditAction())
@@ -437,7 +516,8 @@ class SshSessionsPanel(
         override fun actionPerformed(e: AnActionEvent) = connectSelected()
 
         override fun update(e: AnActionEvent) {
-            e.presentation.isEnabled = selectedSession() != null
+            // Single session only — avoid accidentally opening many terminals.
+            e.presentation.isEnabled = selectedNodes().size == 1 && selectedSession() != null
         }
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
@@ -512,7 +592,8 @@ class SshSessionsPanel(
         override fun actionPerformed(e: AnActionEvent) = renameSelected()
 
         override fun update(e: AnActionEvent) {
-            e.presentation.isEnabled = selectedSession() != null || selectedFolder() != null
+            // Inline rename is one node at a time.
+            e.presentation.isEnabled = selectedNodes().size == 1
         }
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
@@ -520,13 +601,32 @@ class SshSessionsPanel(
 
     private inner class SetColorAction : DumbAwareAction(
         "Set Color…",
-        "Pick a color for the selected session or folder",
+        "Pick a color for the selected sessions or folders",
         null,
     ) {
         override fun actionPerformed(e: AnActionEvent) = setColorSelected()
 
         override fun update(e: AnActionEvent) {
-            e.presentation.isEnabled = selectedSession() != null || selectedFolder() != null
+            val n = selectedNodes().size
+            e.presentation.isEnabled = isAllSessions() || isAllFolders()
+            e.presentation.text = if (n > 1) "Set Color for $n Items…" else "Set Color…"
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    private inner class SetIconAction : DumbAwareAction(
+        "Set Icon…",
+        "Pick an icon for the selected sessions",
+        null,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = setIconSelected()
+
+        override fun update(e: AnActionEvent) {
+            // Icons apply to sessions only (folders keep the folder icon).
+            val n = selectedSessions().size
+            e.presentation.isEnabled = isAllSessions()
+            e.presentation.text = if (n > 1) "Set Icon for $n Sessions…" else "Set Icon…"
         }
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
@@ -540,8 +640,9 @@ class SshSessionsPanel(
         override fun actionPerformed(e: AnActionEvent) = resetColorSelected()
 
         override fun update(e: AnActionEvent) {
-            val color = selectedSession()?.color ?: selectedFolder()?.color
-            e.presentation.isEnabled = !color.isNullOrBlank()
+            val anyColored = selectedSessions().any { it.color.isNotBlank() } ||
+                selectedFolders().any { it.color.isNotBlank() }
+            e.presentation.isEnabled = (isAllSessions() || isAllFolders()) && anyColored
         }
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
@@ -555,7 +656,8 @@ class SshSessionsPanel(
         override fun actionPerformed(e: AnActionEvent) = editSelected()
 
         override fun update(e: AnActionEvent) {
-            e.presentation.isEnabled = selectedSession() != null || selectedFolder() != null
+            // Editing opens a single dialog.
+            e.presentation.isEnabled = selectedNodes().size == 1
         }
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
@@ -569,7 +671,9 @@ class SshSessionsPanel(
         override fun actionPerformed(e: AnActionEvent) = removeSelected()
 
         override fun update(e: AnActionEvent) {
-            e.presentation.isEnabled = selectedSession() != null || selectedFolder() != null
+            val n = selectedNodes().size
+            e.presentation.isEnabled = n > 0
+            e.presentation.text = if (n > 1) "Delete $n Items" else "Delete"
         }
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT

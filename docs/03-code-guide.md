@@ -64,6 +64,9 @@ truth for folders + sessions.
   replace by id), `importBundle` (bulk add for import), `deleteSession`/
   `deleteFolder` (the latter removes the whole subtree via `collectSubtree`, a
   breadth-first walk, and clears each removed session's secrets).
+- **Bulk writes** (for multi-select; each fires a single change): `setSessionsColor`,
+  `setSessionsIcon`, `setFoldersColor`, `deleteSessions`, `deleteFolders` (unions
+  every selected folder's subtree before removing).
 - Every mutation calls **`fireChanged()`** → publishes `TOPIC` on the message bus.
   Panels subscribe and `reload()`. This is how multiple windows stay in sync.
 
@@ -276,14 +279,23 @@ context menu, in-place rename, speed search, and a custom renderer.
   subscribes to `SshSessionService.TOPIC` → `reload()`.
 - **Tree building** — `reload()` rebuilds from `service.foldersIn("")`/
   `sessionsIn("")` recursively, then expands all rows.
-- **Selection helpers** — `selectedNode/Session/Folder`, `targetFolderId` (where
-  new items go), and `selectSession`/`selectFolder` (+ `findSessionNode`/
-  `findFolderNode`) to reselect by id after a rebuild.
-- **Actions** — `addSession`/`editSelected`/`removeSelected`/`connectSelected`,
-  `addFolder`, `import/exportSessions`, and the appearance ops `setColorSelected`
-  (opens `ColorChooser`, writes via the service) / `resetColorSelected`. The
-  toolbar/menu actions are inner `DumbAwareAction`s (each declares
-  `getActionUpdateThread() = EDT` and an `update` that enables based on selection).
+- **Multi-selection** — the tree uses `DISCONTIGUOUS_TREE_SELECTION`, and
+  `keepSelectionHomogeneous()` installs a listener that trims a mixed selection to
+  a single kind (the lead node's), so a selection is always *all sessions* or *all
+  folders*. Helpers: `selectedNodes/Sessions/Folders`, `isAllSessions()`/
+  `isAllFolders()`. `selectedNode/Session/Folder` remain the single (lead) helpers.
+- **Selection helpers** — plus `targetFolderId` (where new items go),
+  `selectSession`/`selectFolder`, and `reselect(sessionIds, folderIds)` to restore
+  a multi-selection after a service rebuild.
+- **Actions** — `addSession`/`editSelected`/`connectSelected` (single-item),
+  `removeSelected` (**bulk** delete of all selected, with a counted confirm),
+  `addFolder`, `import/exportSessions`, and the **bulk** appearance ops:
+  `setColorSelected` (one `ColorChooser` applied to every selected session *or*
+  folder), `resetColorSelected`, and `setIconSelected` (an `IconPickerDialog`
+  applied to every selected session). The inner `DumbAwareAction`s gate
+  enablement on selection shape (e.g. Set Icon only when `isAllSessions()`;
+  Rename/Edit/Connect only when exactly one node) and relabel with the count
+  (e.g. "Delete 3 Items").
 - **`SessionTreeCellEditor`** — `AbstractCellEditor` + `TreeCellEditor`; a
   `JBTextField` that commits on Enter and cancels on Esc; **`isCellEditable`
   returns true only for a `null` event** so editing starts only programmatically.
@@ -336,6 +348,11 @@ fall back to `server`). The icons are flat single-color silhouettes so
 Color helpers: `DEFAULT_SESSION_TINT` (the blue used when no color is chosen), a
 small `PALETTE`, and `parse(hex)` / `toHex(color)` (`#RRGGBB` ↔ `Color` via
 `ColorUtil`). Used by the renderer, the dialog, and the color actions.
+
+### `IconPickerDialog.kt` (0.8.0)
+A small `DialogWrapper` with a `SessionIcons` combo (icon + label renderer);
+`chosenKey()` returns the picked key. Used by the bulk **Set Icon…** action to
+apply one icon to all selected sessions.
 
 ---
 

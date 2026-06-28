@@ -87,6 +87,27 @@ class SshSessionService : PersistentStateComponent<SshSessionState> {
         }
     }
 
+    /** Bulk-sets the color of many sessions (blank resets). Fires a single change. */
+    fun setSessionsColor(ids: Collection<String>, color: String) {
+        var changed = false
+        ids.forEach { id -> findSession(id)?.let { it.color = color; changed = true } }
+        if (changed) fireChanged()
+    }
+
+    /** Bulk-sets the icon of many sessions. Fires a single change. */
+    fun setSessionsIcon(ids: Collection<String>, iconKey: String) {
+        var changed = false
+        ids.forEach { id -> findSession(id)?.let { it.iconKey = iconKey; changed = true } }
+        if (changed) fireChanged()
+    }
+
+    /** Bulk-sets the color of many folders (blank resets). Fires a single change. */
+    fun setFoldersColor(ids: Collection<String>, color: String) {
+        var changed = false
+        ids.forEach { id -> findFolder(id)?.let { it.color = color; changed = true } }
+        if (changed) fireChanged()
+    }
+
     /** Upserts a session. Caller assigns [SshSession.id] (or leaves blank for a new one). */
     fun upsertSession(session: SshSession): SshSession {
         if (session.id.isBlank()) session.id = UUID.randomUUID().toString()
@@ -114,9 +135,31 @@ class SshSessionService : PersistentStateComponent<SshSessionState> {
         }
     }
 
+    /** Deletes many sessions, clearing each one's credentials. Fires a single change. */
+    fun deleteSessions(ids: Collection<String>) {
+        val idSet = ids.toSet()
+        val removed = state.sessions.filter { it.id in idSet }
+        if (removed.isEmpty()) return
+        removed.forEach { SshCredentialStore.clearSession(it.id) }
+        state.sessions.removeIf { it.id in idSet }
+        fireChanged()
+    }
+
     /** Deletes a folder and everything (sub-folders + sessions) under it, recursively. */
     fun deleteFolder(id: String) {
         val toRemove = collectSubtree(id)
+        state.folders.removeIf { it.id in toRemove }
+        val removedSessions = state.sessions.filter { it.folderId in toRemove }
+        removedSessions.forEach { SshCredentialStore.clearSession(it.id) }
+        state.sessions.removeIf { it.folderId in toRemove }
+        fireChanged()
+    }
+
+    /** Deletes many folders (each with its whole subtree). Fires a single change. */
+    fun deleteFolders(ids: Collection<String>) {
+        val toRemove = linkedSetOf<String>()
+        ids.forEach { toRemove.addAll(collectSubtree(it)) }
+        if (toRemove.isEmpty()) return
         state.folders.removeIf { it.id in toRemove }
         val removedSessions = state.sessions.filter { it.folderId in toRemove }
         removedSessions.forEach { SshCredentialStore.clearSession(it.id) }

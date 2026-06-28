@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.haifasoft.haifassh</id>
     <name>HaifaSSH - SSH Session Manager</name>
-    <version>0.7.0</version>
+    <version>0.8.0</version>
     <vendor email="a.ganayem@haifasoft.com" url="https://haifasoft.com">HaifaSoft</vendor>
 
     <description><![CDATA[
@@ -19,6 +19,10 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.8.0 — <b>Multi-select bulk edits</b>: select multiple sessions (or multiple
+                folders) with Ctrl/Shift-click and change them together — set the same color,
+                set the same icon (sessions), or delete them all at once. A selection stays to
+                one kind (sessions or folders), so bulk actions are unambiguous.</li>
             <li>0.7.0 — <b>Configurable scrollback</b>: set how many lines each terminal keeps
                 (Settings → Tools → HaifaSSH Terminal), so large outputs like
                 <code>tail -f -n 10000</code> stay fully scrollable. Host-key verification now
