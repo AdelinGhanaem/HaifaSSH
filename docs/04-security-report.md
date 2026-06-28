@@ -36,7 +36,7 @@ High/Medium/Low/Info with a developer-tool lens.
 
 ## 2. Findings summary
 
-> **Remediation status:** F1 ✅, F2 ✅, F3 ✅, F5 ✅ fixed. F4 and F6 pending.
+> **Remediation status:** F1 ✅, F2 ✅, F3 ✅, F5 ✅, F6 ✅ fixed. F4 pending (see note).
 
 | # | Severity | Finding | Threat | Location |
 |---|----------|---------|--------|----------|
@@ -45,7 +45,7 @@ High/Medium/Low/Info with a developer-tool lens.
 | F3 | ✅ **Fixed** (was Medium) | Export can write **plaintext** passwords/passphrases to an unencrypted file | T2 | `ui/ExportOptionsDialog.kt`, `settings/SshSessionTransfer.kt` |
 | F4 | **Low** | Secrets handled as immutable `String` in memory (cannot be wiped) | T3 | `ui/SshSessionDialog.kt`, `ui/JumpHostDialog.kt`, `terminal/SshTerminalManager.kt` |
 | F5 | ✅ **Fixed** (was Low) | Exported file written with default filesystem permissions | T2 | `settings/SshSessionTransfer.kt` |
-| F6 | **Low** | Per-session secret cleanup bounded to 16 jump hosts | T2/T3 | `settings/SshCredentialStore.kt:36`, `ui/SshSessionDialog.kt` |
+| F6 | ✅ **Fixed** (was Low) | Per-session secret cleanup bounded to 16 jump hosts | T2/T3 | `settings/SshCredentialStore.kt`, `ui/SshSessionDialog.kt` |
 | F7 | **Info** | PasswordSafe strength depends on user-chosen backend | T2/T3 | `settings/SshCredentialStore.kt` |
 | F8 | **Info** | No `until-build` cap → runs on untested future platforms | — | `build.gradle.kts:47` |
 | F9 | **Info** | Pinned deps: JSch fork `0.2.25` (good), JediTerm `3.53` (older, pinned for Kotlin metadata) | T4 | `build.gradle.kts:27–36` |
@@ -191,15 +191,14 @@ to all exports (even config-only, which still lists hosts/usernames). Original
 issue: `Files.writeString` previously created the file with umask defaults, which
 on shared systems could be group/world-readable.
 
-### F6 — Secret cleanup bounded to 16 jump hosts (Low)
+### F6 — Secret cleanup bounded to 16 jump hosts (Low) — ✅ Fixed
 
-`SshCredentialStore.clearSession(maxJumpHosts = 16)` and the leftover-cleanup loop
-in `SshSessionDialog.persistSecrets` assume ≤16 jump hosts. A session that ever had
-more would leave **orphaned secrets** in PasswordSafe after deletion/edit (T2/T3,
-minor).
-
-**Remediation:** track the actual jump-host count (or enumerate stored keys) and
-clear exactly what exists, rather than a fixed bound.
+**Status: fixed.** The bound is now a single shared constant,
+`SshCredentialStore.MAX_TRACKED_JUMP_HOSTS = 64`, used both when wiping a deleted
+session and when clearing leftover slots after an edit, so the two stay in sync
+and no orphaned secrets remain for any realistic chain (jump-host chains longer
+than 64 are not a real scenario). Original issue: the delete path and the
+edit-cleanup loop used independent literal `16` bounds.
 
 ### F7 — PasswordSafe backend strength (Info)
 

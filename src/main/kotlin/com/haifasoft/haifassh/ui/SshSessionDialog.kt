@@ -212,8 +212,9 @@ class SshSessionDialog(
                 store.setJumpPassphrase(saved.id, index, null)
             }
         }
-        // Drop secrets left over from jump hosts that were removed.
-        for (index in entries.size until entries.size + 16) {
+        // Drop secrets left over from jump hosts that were removed (up to the
+        // same bound used when wiping a deleted session, so none are orphaned).
+        for (index in entries.size until SshCredentialStore.MAX_TRACKED_JUMP_HOSTS) {
             store.setJumpPassword(saved.id, index, null)
             store.setJumpPassphrase(saved.id, index, null)
         }

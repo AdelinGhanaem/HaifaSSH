@@ -32,11 +32,18 @@ object SshCredentialStore {
     fun getJumpPassphrase(sessionId: String, index: Int): String? = read(jumpPassphraseKey(sessionId, index))
     fun setJumpPassphrase(sessionId: String, index: Int, value: String?) = write(jumpPassphraseKey(sessionId, index), value)
 
-    /** Removes every secret associated with a session (called on delete). Best-effort up to [maxJumpHosts]. */
-    fun clearSession(sessionId: String, maxJumpHosts: Int = 16) {
+    /**
+     * Upper bound on jump-host secret slots tracked per session. Used both when
+     * clearing leftover slots after an edit and when wiping a deleted session, so
+     * the two stay in sync and no orphaned secrets remain for any realistic chain.
+     */
+    const val MAX_TRACKED_JUMP_HOSTS = 64
+
+    /** Removes every secret associated with a session (called on delete). */
+    fun clearSession(sessionId: String) {
         write(passwordKey(sessionId), null)
         write(passphraseKey(sessionId), null)
-        for (i in 0 until maxJumpHosts) {
+        for (i in 0 until MAX_TRACKED_JUMP_HOSTS) {
             write(jumpPasswordKey(sessionId, i), null)
             write(jumpPassphraseKey(sessionId, i), null)
         }
