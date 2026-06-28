@@ -36,15 +36,15 @@ High/Medium/Low/Info with a developer-tool lens.
 
 ## 2. Findings summary
 
-> **Remediation status:** F1 ✅ fixed, F2 ✅ fixed. Others pending.
+> **Remediation status:** F1 ✅, F2 ✅, F3 ✅, F5 ✅ fixed. F4 and F6 pending.
 
 | # | Severity | Finding | Threat | Location |
 |---|----------|---------|--------|----------|
 | F1 | ✅ **Fixed** (was High) | SSH host-key verification disabled (`StrictHostKeyChecking=no`); no `known_hosts`, no fingerprint check | T1 | `ssh/SshConnector.kt` |
 | F2 | ✅ **Fixed** (was Medium) | Legacy weak algorithms re-enabled (`ssh-rsa`/SHA-1, `ssh-dss`/DSA) | T1 | `ssh/SshConnector.kt:72–86` |
-| F3 | **Medium** | Export can write **plaintext** passwords/passphrases to an unencrypted file | T2 | `ui/ExportOptionsDialog.kt`, `settings/SshSessionTransfer.kt:24–32` |
+| F3 | ✅ **Fixed** (was Medium) | Export can write **plaintext** passwords/passphrases to an unencrypted file | T2 | `ui/ExportOptionsDialog.kt`, `settings/SshSessionTransfer.kt` |
 | F4 | **Low** | Secrets handled as immutable `String` in memory (cannot be wiped) | T3 | `ui/SshSessionDialog.kt`, `ui/JumpHostDialog.kt`, `terminal/SshTerminalManager.kt` |
-| F5 | **Low** | Exported file written with default filesystem permissions | T2 | `settings/SshSessionTransfer.kt:32` |
+| F5 | ✅ **Fixed** (was Low) | Exported file written with default filesystem permissions | T2 | `settings/SshSessionTransfer.kt` |
 | F6 | **Low** | Per-session secret cleanup bounded to 16 jump hosts | T2/T3 | `settings/SshCredentialStore.kt:36`, `ui/SshSessionDialog.kt` |
 | F7 | **Info** | PasswordSafe strength depends on user-chosen backend | T2/T3 | `settings/SshCredentialStore.kt` |
 | F8 | **Info** | No `until-build` cap → runs on untested future platforms | — | `build.gradle.kts:47` |
@@ -139,7 +139,16 @@ SHA-1/DSA algorithms" checkbox) rather than globally on, so the weakening applie
 only to the specific old host that needs it, and modern hosts keep a strict
 algorithm set. Prefer enabling only `ssh-rsa` (SHA-1) over `ssh-dss` where possible.
 
-### F3 — Plaintext credential export (Medium)
+### F3 — Plaintext credential export (Medium) — ✅ Fixed
+
+**Status: fixed.** Exports that include credentials are now **encrypted** with a
+user passphrase: AES-256-GCM with a key derived via PBKDF2-HMAC-SHA256 (210k
+iterations, random per-file salt + IV), implemented in `settings/ExportCrypto.kt`.
+The export dialog now requires a passphrase (with confirmation) when secrets are
+included, and import detects the encrypted format (`HAIFASSH-ENC-V1` header),
+prompts for the passphrase, and reports a clear error on a wrong one (GCM tag
+mismatch → `DecryptionException`). Config-only exports remain plain XML. The
+round-trip and wrong-passphrase rejection were verified on JDK 17. Original issue:
 
 When the user ticks *Include saved passwords & passphrases*, `export` pulls
 secrets out of PasswordSafe and writes them **inline, in cleartext**, into the
@@ -173,16 +182,14 @@ them after use; pass them to JSch (`setPassword(byte[])` is supported) without a
 intermediate `String`. This is defense-in-depth; on a developer workstation the
 practical risk is modest.
 
-### F5 — Export file permissions (Low)
+### F5 — Export file permissions (Low) — ✅ Fixed
 
-`Files.writeString(target, …)` (`SshSessionTransfer.kt:32`) creates the file with
-the process umask defaults, which on shared/multi-user systems can be
-group/world-readable. Combined with F3 this can expose secrets to other local
-users.
-
-**Remediation:** when writing an export (especially with secrets), create it with
-owner-only permissions (`PosixFilePermissions` `rw-------` on POSIX; restrict ACL
-on Windows) — ideally create the file empty with the right perms, then write.
+**Status: fixed.** After writing any export, `restrictToOwner` tightens the file
+to owner-only access — `rw-------` on POSIX via `PosixFilePermissions`, and on
+non-POSIX (Windows) it strips group/other read & write via the `File` API. Applied
+to all exports (even config-only, which still lists hosts/usernames). Original
+issue: `Files.writeString` previously created the file with umask defaults, which
+on shared systems could be group/world-readable.
 
 ### F6 — Secret cleanup bounded to 16 jump hosts (Low)
 

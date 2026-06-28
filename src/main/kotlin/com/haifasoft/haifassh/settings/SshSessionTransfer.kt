@@ -5,31 +5,75 @@ import com.intellij.util.xmlb.XmlSerializer
 import com.haifasoft.haifassh.model.JumpHost
 import com.haifasoft.haifassh.model.SshFolder
 import com.haifasoft.haifassh.model.SshSession
+import java.io.StringReader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
 
 /**
- * Exports the SSH session tree to a portable XML file and imports it back,
- * optionally carrying credentials. Import always assigns fresh ids and remaps
- * folder references, so importing never overwrites existing sessions — it merges.
+ * Exports the SSH session tree to a portable file and imports it back, optionally
+ * carrying credentials. Import always assigns fresh ids and remaps folder
+ * references, so importing never overwrites existing sessions — it merges.
+ *
+ * Config-only exports are plain XML. Exports that include credentials are
+ * **encrypted** with a user passphrase (see [ExportCrypto]) so secrets are never
+ * written to disk in cleartext.
  */
 object SshSessionTransfer {
 
     /** Result of an import, for user feedback. */
     data class ImportResult(val folders: Int, val sessions: Int, val secretsRestored: Boolean)
 
+    /** Thrown when an encrypted bundle can't be read (missing/incorrect passphrase). */
+    class DecryptionException(message: String) : Exception(message)
+
     // ---- Export ------------------------------------------------------------
 
-    fun export(target: Path, includeSecrets: Boolean) {
+    /**
+     * @param passphrase required (non-null, non-empty) when [includeSecrets] is true;
+     * the bundle is then encrypted. Ignored for config-only exports.
+     */
+    fun export(target: Path, includeSecrets: Boolean, passphrase: CharArray? = null) {
         val service = SshSessionService.getInstance()
         val bundle = SshExportBundle().apply {
             this.includesSecrets = includeSecrets
             folders = service.folders().map { it.copyForExport() }.toMutableList()
             sessions = service.sessions().map { it.toExport(includeSecrets) }.toMutableList()
         }
-        val element = XmlSerializer.serialize(bundle)
-        Files.writeString(target, JDOMUtil.write(element))
+        val xml = JDOMUtil.write(XmlSerializer.serialize(bundle))
+        val output = if (includeSecrets) {
+            require(passphrase != null && passphrase.isNotEmpty()) {
+                "A passphrase is required to export credentials"
+            }
+            ExportCrypto.encrypt(xml, passphrase)
+        } else {
+            xml
+        }
+        Files.writeString(target, output)
+        restrictToOwner(target)
+    }
+
+    /**
+     * Best-effort tightening of the export file to owner-only access, so other
+     * local users can't read it (matters most for encrypted bundles, but applied
+     * always since the file still lists hosts/usernames). POSIX → `rw-------`;
+     * elsewhere → strip group/other read & write via the File API.
+     */
+    private fun restrictToOwner(target: Path) {
+        runCatching {
+            val view = Files.getFileAttributeView(target, java.nio.file.attribute.PosixFileAttributeView::class.java)
+            if (view != null) {
+                Files.setPosixFilePermissions(
+                    target,
+                    java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
+                )
+            } else {
+                target.toFile().apply {
+                    setReadable(false, false); setReadable(true, true)
+                    setWritable(false, false); setWritable(true, true)
+                }
+            }
+        }
     }
 
     private fun SshFolder.copyForExport(): SshFolder = SshFolder().also {
@@ -76,8 +120,29 @@ object SshSessionTransfer {
 
     // ---- Import ------------------------------------------------------------
 
-    fun import(source: Path): ImportResult {
-        val element = JDOMUtil.load(source)
+    /** True if [source] is an encrypted bundle and therefore needs a passphrase. */
+    fun isEncrypted(source: Path): Boolean =
+        runCatching { ExportCrypto.isEncrypted(Files.readString(source)) }.getOrDefault(false)
+
+    /**
+     * @param passphrase required when [isEncrypted] is true for this file.
+     * @throws DecryptionException when the passphrase is missing or incorrect.
+     */
+    fun import(source: Path, passphrase: CharArray? = null): ImportResult {
+        val raw = Files.readString(source)
+        val xml = if (ExportCrypto.isEncrypted(raw)) {
+            if (passphrase == null || passphrase.isEmpty()) {
+                throw DecryptionException("This export is encrypted; a passphrase is required.")
+            }
+            try {
+                ExportCrypto.decrypt(raw, passphrase)
+            } catch (t: Throwable) {
+                throw DecryptionException("Incorrect passphrase or corrupted file.")
+            }
+        } else {
+            raw
+        }
+        val element = JDOMUtil.load(StringReader(xml))
         val bundle = XmlSerializer.deserialize(element, SshExportBundle::class.java)
 
         // Fresh ids keep the import a merge — existing sessions are never clobbered.

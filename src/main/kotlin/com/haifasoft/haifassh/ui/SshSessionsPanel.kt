@@ -295,10 +295,11 @@ class SshSessionsPanel(
             ?: return
 
         try {
-            SshSessionTransfer.export(wrapper.file.toPath(), options.includeSecrets)
+            SshSessionTransfer.export(wrapper.file.toPath(), options.includeSecrets, options.passphrase)
+            val note = if (options.includeSecrets) " (encrypted with your passphrase)" else ""
             Messages.showInfoMessage(
                 project,
-                "Exported $count session(s) to:\n${wrapper.file.path}",
+                "Exported $count session(s)$note to:\n${wrapper.file.path}",
                 "Export Complete",
             )
         } catch (t: Throwable) {
@@ -316,8 +317,19 @@ class SshSessionsPanel(
             .withDescription("Select a HaifaSSH export file")
         val file = FileChooser.chooseFile(descriptor, project, null) ?: return
 
+        val passphrase: CharArray? = if (SshSessionTransfer.isEncrypted(file.toNioPath())) {
+            Messages.showPasswordDialog(
+                project,
+                "This export is encrypted. Enter its passphrase:",
+                "Import SSH Sessions",
+                null,
+            )?.toCharArray() ?: return
+        } else {
+            null
+        }
+
         try {
-            val result = SshSessionTransfer.import(file.toNioPath())
+            val result = SshSessionTransfer.import(file.toNioPath(), passphrase)
             val secretsNote = if (result.secretsRestored) " Credentials were restored." else ""
             Messages.showInfoMessage(
                 project,
