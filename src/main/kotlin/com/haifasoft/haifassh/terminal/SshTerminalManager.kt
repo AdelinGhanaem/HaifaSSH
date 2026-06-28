@@ -43,7 +43,7 @@ class SshTerminalManager(private val project: Project) {
 
             override fun run(indicator: ProgressIndicator) {
                 indicator.isIndeterminate = true
-                handle = SshConnector.openShell(chain, "xterm-256color", 80, 24)
+                handle = SshConnector.openShell(chain, "xterm-256color", 80, 24, hostKeyPrompt())
             }
 
             override fun onSuccess() {
@@ -149,6 +149,35 @@ class SshTerminalManager(private val project: Project) {
             ) ?: return null // user cancelled
         }
         return HopConfig(host, port, username, authType, keyPath, resolvedPassword, passphrase)
+    }
+
+    /**
+     * Host-key prompt that runs on the EDT (the connection itself is on a
+     * background thread). Unknown keys ask for trust-on-first-use; a *changed*
+     * key shows JSch's MITM warning first, then asks — defaulting the focus to
+     * the safe "No" choice.
+     */
+    private fun hostKeyPrompt(): SshConnector.HostKeyPrompt = object : SshConnector.HostKeyPrompt {
+        override fun confirm(message: String): Boolean {
+            var trust = false
+            ApplicationManager.getApplication().invokeAndWait {
+                trust = Messages.showYesNoDialog(
+                    project,
+                    message,
+                    "SSH Host Key Verification",
+                    "Connect",
+                    "Abort",
+                    Messages.getWarningIcon(),
+                ) == Messages.YES
+            }
+            return trust
+        }
+
+        override fun notify(message: String) {
+            ApplicationManager.getApplication().invokeAndWait {
+                Messages.showWarningDialog(project, message, "SSH Host Key Warning")
+            }
+        }
     }
 
     private fun notifyError(message: String) {

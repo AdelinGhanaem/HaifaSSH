@@ -36,9 +36,11 @@ High/Medium/Low/Info with a developer-tool lens.
 
 ## 2. Findings summary
 
+> **Remediation status:** F1 ✅ fixed. Others pending.
+
 | # | Severity | Finding | Threat | Location |
 |---|----------|---------|--------|----------|
-| F1 | **High** | SSH host-key verification disabled (`StrictHostKeyChecking=no`); no `known_hosts`, no fingerprint check | T1 | `ssh/SshConnector.kt:40` |
+| F1 | ✅ **Fixed** (was High) | SSH host-key verification disabled (`StrictHostKeyChecking=no`); no `known_hosts`, no fingerprint check | T1 | `ssh/SshConnector.kt` |
 | F2 | **Medium** | Legacy weak algorithms re-enabled (`ssh-rsa`/SHA-1, `ssh-dss`/DSA) | T1 | `ssh/SshConnector.kt:72–86` |
 | F3 | **Medium** | Export can write **plaintext** passwords/passphrases to an unencrypted file | T2 | `ui/ExportOptionsDialog.kt`, `settings/SshSessionTransfer.kt:24–32` |
 | F4 | **Low** | Secrets handled as immutable `String` in memory (cannot be wiped) | T3 | `ui/SshSessionDialog.kt`, `ui/JumpHostDialog.kt`, `terminal/SshTerminalManager.kt` |
@@ -68,10 +70,21 @@ High/Medium/Low/Info with a developer-tool lens.
 
 ## 3. Detailed findings
 
-### F1 — Host-key verification disabled (High)
+### F1 — Host-key verification disabled (High) — ✅ Fixed
+
+**Status: fixed.** The connector now loads a plugin-managed `known_hosts` file
+(`<IDE config>/haifassh/known_hosts`), sets `StrictHostKeyChecking=ask`, and
+prompts the user (trust-on-first-use) via a `HostKeyPrompt` shown on the EDT.
+Each hop is verified against its **real** host identity using a per-hop
+`HostKeyAlias` (`host` for port 22, `[host]:port` otherwise) — JSch uses the alias
+verbatim as the known_hosts key, so verification is correct and stable even for
+**tunneled jump hosts** (whose socket port is an ephemeral local port). A
+**changed** key triggers JSch's MITM warning before the confirm, defaulting to the
+safe "Abort" choice. The original issue is described below for the record.
 
 ```kotlin
-session.setConfig("StrictHostKeyChecking", "no")   // SshConnector.kt:40
+// BEFORE (insecure):
+session.setConfig("StrictHostKeyChecking", "no")
 ```
 
 Every hop is connected with strict host-key checking off and **no `known_hosts`

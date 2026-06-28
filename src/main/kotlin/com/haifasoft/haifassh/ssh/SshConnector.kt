@@ -1,13 +1,20 @@
 package com.haifasoft.haifassh.ssh
 
+import com.intellij.openapi.application.PathManager
 import com.jcraft.jsch.ChannelShell
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
+import com.jcraft.jsch.UserInfo
 import com.haifasoft.haifassh.model.SshAuthType
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Opens interactive SSH shells, transparently chaining through any number of
  * jump hosts via nested local port forwarding (equivalent to OpenSSH ProxyJump).
+ *
+ * Host keys are verified against a plugin-managed `known_hosts` file with
+ * trust-on-first-use semantics ([HostKeyPrompt]); see [openShell].
  */
 object SshConnector {
 
@@ -15,13 +22,38 @@ object SshConnector {
     private const val KEEPALIVE_INTERVAL_MS = 30_000
 
     /**
+     * Asks the user whether to trust a host key. Implemented by the UI layer so
+     * the prompt can run on the EDT while the connection runs in the background.
+     */
+    interface HostKeyPrompt {
+        /**
+         * @param message JSch's host-key text (host, key type, fingerprint, and —
+         * for a *changed* key — the loud MITM warning). Return true to trust and
+         * continue, false to abort the connection.
+         */
+        fun confirm(message: String): Boolean
+
+        /** Informational warning shown before a confirm (e.g. the changed-key banner). */
+        fun notify(message: String) {}
+    }
+
+    /**
      * @param chain ordered hops; the last element is the target host, everything before it is a jump host.
      * @param termType PTY terminal type advertised to the remote (e.g. "xterm-256color").
+     * @param hostKeyPrompt consulted when a host key is unknown or has changed.
      */
-    fun openShell(chain: List<HopConfig>, termType: String, columns: Int, rows: Int): SshShellHandle {
+    fun openShell(
+        chain: List<HopConfig>,
+        termType: String,
+        columns: Int,
+        rows: Int,
+        hostKeyPrompt: HostKeyPrompt,
+    ): SshShellHandle {
         require(chain.isNotEmpty()) { "Connection chain must contain at least the target host" }
 
         val jsch = JSch()
+        jsch.setKnownHosts(knownHostsFile())
+        val userInfo = HostKeyUserInfo(hostKeyPrompt)
         val opened = ArrayList<Session>(chain.size)
         try {
             var previous: Session? = null
@@ -37,7 +69,12 @@ object SshConnector {
 
                 val session = jsch.getSession(hop.username, connectHost, connectPort)
                 applyAuth(jsch, session, hop)
-                session.setConfig("StrictHostKeyChecking", "no")
+                // Verify against the hop's REAL identity, not the (possibly tunneled,
+                // ephemeral-port) socket we actually connect to. JSch uses the alias
+                // verbatim as the known_hosts key, so entries stay stable across jumps.
+                session.hostKeyAlias = knownHostsAlias(hop.host, hop.port)
+                session.userInfo = userInfo
+                session.setConfig("StrictHostKeyChecking", "ask")
                 enableLegacyAlgorithms(session)
                 session.serverAliveInterval = KEEPALIVE_INTERVAL_MS
                 session.connect(CONNECT_TIMEOUT_MS)
@@ -83,6 +120,37 @@ object SshConnector {
         val have = (current ?: "").split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
         for (algorithm in additions) if (algorithm !in have) have.add(algorithm)
         return have.joinToString(",")
+    }
+
+    /**
+     * The plugin-managed `known_hosts` file under the IDE config directory. Kept
+     * separate from `~/.ssh/known_hosts` so the plugin never rewrites the user's
+     * system file. Created empty on first use so JSch can load and later sync it.
+     */
+    private fun knownHostsFile(): String {
+        val dir = Path.of(PathManager.getConfigPath(), "haifassh")
+        Files.createDirectories(dir)
+        val file = dir.resolve("known_hosts")
+        if (Files.notExists(file)) Files.createFile(file)
+        return file.toString()
+    }
+
+    /** OpenSSH-style host identity: `host` for port 22, `[host]:port` otherwise. */
+    private fun knownHostsAlias(host: String, port: Int): String =
+        if (port == 22) host else "[$host]:$port"
+
+    /**
+     * Bridges JSch's host-key prompts to the UI [HostKeyPrompt]. Only host-key
+     * decisions go through here; passwords/passphrases are supplied directly
+     * (`setPassword` / `addIdentity`), so the credential methods are inert.
+     */
+    private class HostKeyUserInfo(private val prompt: HostKeyPrompt) : UserInfo {
+        override fun getPassword(): String? = null
+        override fun getPassphrase(): String? = null
+        override fun promptPassword(message: String): Boolean = false
+        override fun promptPassphrase(message: String): Boolean = false
+        override fun promptYesNo(message: String): Boolean = prompt.confirm(message)
+        override fun showMessage(message: String) = prompt.notify(message)
     }
 
     private fun applyAuth(jsch: JSch, session: Session, hop: HopConfig) {
