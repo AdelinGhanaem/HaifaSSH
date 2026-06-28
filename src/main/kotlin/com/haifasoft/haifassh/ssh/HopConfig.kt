@@ -15,4 +15,6 @@ data class HopConfig(
     val privateKeyPath: String,
     val password: String?,
     val passphrase: String?,
+    /** Opt-in fallback to legacy SHA-1/DSA algorithms for this hop. */
+    val allowLegacy: Boolean = false,
 )

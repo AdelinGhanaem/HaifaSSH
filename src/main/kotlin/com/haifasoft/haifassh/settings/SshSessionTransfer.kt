@@ -51,6 +51,7 @@ object SshSessionTransfer {
             e.authType = authType
             e.privateKeyPath = privateKeyPath
             e.savePassword = savePassword
+            e.allowLegacyAlgorithms = allowLegacyAlgorithms
             e.iconKey = iconKey
             e.color = color
             e.jumpHosts = jumpHosts.mapIndexed { index, jump ->
@@ -106,6 +107,7 @@ object SshSessionTransfer {
                 it.authType = s.authType
                 it.privateKeyPath = s.privateKeyPath
                 it.savePassword = s.savePassword
+                it.allowLegacyAlgorithms = s.allowLegacyAlgorithms
                 it.iconKey = s.iconKey
                 it.color = s.color
                 it.jumpHosts = s.jumpHosts.map { j ->

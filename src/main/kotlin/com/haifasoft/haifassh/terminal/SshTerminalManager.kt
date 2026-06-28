@@ -111,6 +111,7 @@ class SshTerminalManager(private val project: Project) {
                 keyPath = jump.privateKeyPath,
                 password = SshCredentialStore.getJumpPassword(session.id, index),
                 passphrase = SshCredentialStore.getJumpPassphrase(session.id, index),
+                allowLegacy = session.allowLegacyAlgorithms,
             ) ?: return null
             chain.add(hop)
         }
@@ -124,6 +125,7 @@ class SshTerminalManager(private val project: Project) {
             keyPath = session.privateKeyPath,
             password = SshCredentialStore.getPassword(session.id),
             passphrase = SshCredentialStore.getPassphrase(session.id),
+            allowLegacy = session.allowLegacyAlgorithms,
         ) ?: return null
         chain.add(target)
         return chain
@@ -138,6 +140,7 @@ class SshTerminalManager(private val project: Project) {
         keyPath: String,
         password: String?,
         passphrase: String?,
+        allowLegacy: Boolean,
     ): HopConfig? {
         var resolvedPassword = password
         if (authType == SshAuthType.PASSWORD && resolvedPassword.isNullOrEmpty()) {
@@ -148,7 +151,7 @@ class SshTerminalManager(private val project: Project) {
                 null,
             ) ?: return null // user cancelled
         }
-        return HopConfig(host, port, username, authType, keyPath, resolvedPassword, passphrase)
+        return HopConfig(host, port, username, authType, keyPath, resolvedPassword, passphrase, allowLegacy)
     }
 
     /**

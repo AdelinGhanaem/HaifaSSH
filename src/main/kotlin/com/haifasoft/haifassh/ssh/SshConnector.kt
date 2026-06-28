@@ -75,7 +75,7 @@ object SshConnector {
                 session.hostKeyAlias = knownHostsAlias(hop.host, hop.port)
                 session.userInfo = userInfo
                 session.setConfig("StrictHostKeyChecking", "ask")
-                enableLegacyAlgorithms(session)
+                if (hop.allowLegacy) enableLegacyAlgorithms(session)
                 session.serverAliveInterval = KEEPALIVE_INTERVAL_MS
                 session.connect(CONNECT_TIMEOUT_MS)
                 opened.add(session)

@@ -36,6 +36,7 @@ class SshSessionExport {
     var authType: SshAuthType = SshAuthType.PASSWORD
     var privateKeyPath: String = ""
     var savePassword: Boolean = true
+    var allowLegacyAlgorithms: Boolean = false
     var iconKey: String = ""
     var color: String = ""
 

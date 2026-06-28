@@ -36,12 +36,12 @@ High/Medium/Low/Info with a developer-tool lens.
 
 ## 2. Findings summary
 
-> **Remediation status:** F1 ✅ fixed. Others pending.
+> **Remediation status:** F1 ✅ fixed, F2 ✅ fixed. Others pending.
 
 | # | Severity | Finding | Threat | Location |
 |---|----------|---------|--------|----------|
 | F1 | ✅ **Fixed** (was High) | SSH host-key verification disabled (`StrictHostKeyChecking=no`); no `known_hosts`, no fingerprint check | T1 | `ssh/SshConnector.kt` |
-| F2 | **Medium** | Legacy weak algorithms re-enabled (`ssh-rsa`/SHA-1, `ssh-dss`/DSA) | T1 | `ssh/SshConnector.kt:72–86` |
+| F2 | ✅ **Fixed** (was Medium) | Legacy weak algorithms re-enabled (`ssh-rsa`/SHA-1, `ssh-dss`/DSA) | T1 | `ssh/SshConnector.kt:72–86` |
 | F3 | **Medium** | Export can write **plaintext** passwords/passphrases to an unencrypted file | T2 | `ui/ExportOptionsDialog.kt`, `settings/SshSessionTransfer.kt:24–32` |
 | F4 | **Low** | Secrets handled as immutable `String` in memory (cannot be wiped) | T3 | `ui/SshSessionDialog.kt`, `ui/JumpHostDialog.kt`, `terminal/SshTerminalManager.kt` |
 | F5 | **Low** | Exported file written with default filesystem permissions | T2 | `settings/SshSessionTransfer.kt:32` |
@@ -112,11 +112,19 @@ OpenSSH:
 This is the change that moves the plugin from "convenient but unsafe on hostile
 networks" to "safe by default."
 
-### F2 — Legacy weak algorithms re-enabled (Medium)
+### F2 — Legacy weak algorithms re-enabled (Medium) — ✅ Fixed
+
+**Status: fixed.** The legacy fallback is now **opt-in per session** via a new
+`SshSession.allowLegacyAlgorithms` flag (off by default), surfaced as an "Allow
+legacy SHA-1/DSA algorithms (only for old servers)" checkbox in the session
+dialog and threaded through `HopConfig` to the connector
+(`if (hop.allowLegacy) enableLegacyAlgorithms(session)`). Modern hosts now keep a
+strict algorithm set; the weak `ssh-rsa`/`ssh-dss` fallback applies only to the
+specific old host the user explicitly enables it for. Original issue:
 
 ```kotlin
 val legacy = listOf("ssh-rsa", "ssh-dss")           // SshConnector.kt:73
-// appended to server_host_key and PubkeyAcceptedAlgorithms
+// previously appended unconditionally for every hop
 ```
 
 `ssh-dss` (DSA, effectively 1024-bit) and `ssh-rsa` (RSA with **SHA-1**) are

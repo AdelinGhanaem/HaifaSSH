@@ -49,6 +49,13 @@ class SshSessionDialog(
     private val passwordField = JBPasswordField()
     private val passphraseField = JBPasswordField()
     private val savePasswordCheck = JBCheckBox("Store credentials in IDE password safe", session.savePassword)
+    private val allowLegacyCheck = JBCheckBox(
+        "Allow legacy SHA-1/DSA algorithms (only for old servers)",
+        session.allowLegacyAlgorithms,
+    ).apply {
+        toolTipText = "Enables the weak ssh-rsa/ssh-dss algorithms as a fallback. " +
+            "Leave off unless this host offers nothing modern."
+    }
 
     private val iconCombo = ComboBox(SessionIcons.choices.toTypedArray()).apply {
         selectedItem = SessionIcons.choice(session.iconKey)
@@ -122,6 +129,7 @@ class SshSessionDialog(
             .addLabeledComponent("Private key:", keyPathField)
             .addLabeledComponent("Passphrase:", passphraseField)
             .addComponent(savePasswordCheck)
+            .addComponent(allowLegacyCheck)
             .addLabeledComponent("Icon:", iconCombo)
             .addLabeledComponent("Color:", colorRow)
             .addLabeledComponentFillVertically("Jump hosts:", jumpPanel)
@@ -174,6 +182,7 @@ class SshSessionDialog(
         session.authType = authCombo.selectedItem as SshAuthType
         session.privateKeyPath = keyPathField.text.trim()
         session.savePassword = savePasswordCheck.isSelected
+        session.allowLegacyAlgorithms = allowLegacyCheck.isSelected
         session.iconKey = (iconCombo.selectedItem as? SessionIcons.Choice)?.key.orEmpty()
         session.color = colorPanel.selectedColor?.let { AppearanceColors.toHex(it) } ?: ""
         session.jumpHosts = jumpModel.items.map { it.host }.toMutableList()

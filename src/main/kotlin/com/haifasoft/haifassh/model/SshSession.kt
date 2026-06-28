@@ -27,6 +27,14 @@ class SshSession {
     var savePassword: Boolean = true
 
     /**
+     * Opt-in fallback to legacy SHA-1/DSA algorithms (`ssh-rsa`, `ssh-dss`) for
+     * old servers/appliances. Off by default — these are cryptographically weak,
+     * so enable only for a host that offers nothing modern. Applies to the whole
+     * connection chain (target + jump hosts).
+     */
+    var allowLegacyAlgorithms: Boolean = false
+
+    /**
      * Appearance in the session tree. [iconKey] selects one of the built-in
      * [com.haifasoft.haifassh.ui.SessionIcons] shapes (blank = default).
      * [color] is an `#RRGGBB` tint applied to the icon and name (blank = default).
@@ -50,6 +58,7 @@ class SshSession {
         c.authType = authType
         c.privateKeyPath = privateKeyPath
         c.savePassword = savePassword
+        c.allowLegacyAlgorithms = allowLegacyAlgorithms
         c.iconKey = iconKey
         c.color = color
         c.jumpHosts = jumpHosts.map { it.copyOf() }.toMutableList()
