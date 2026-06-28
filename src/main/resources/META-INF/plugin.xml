@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.haifasoft.haifassh</id>
     <name>HaifaSSH - SSH Session Manager</name>
-    <version>0.5.0</version>
+    <version>0.6.0</version>
     <vendor email="a.ganayem@haifasoft.com" url="https://haifasoft.com">HaifaSoft</vendor>
 
     <description><![CDATA[
@@ -19,6 +19,15 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.6.0 — <b>Security hardening.</b> SSH host keys are now <b>verified</b>
+                (trust-on-first-use against a managed known_hosts; changed keys warn and
+                default to abort) — previously host-key checking was disabled. Weak legacy
+                <b>SHA-1/DSA algorithms are now opt-in per session</b> (checkbox) instead of
+                always on. Exports that include credentials are <b>encrypted</b> with a
+                passphrase (AES-256) and written owner-only, instead of plaintext. In-memory
+                connection secrets are passed as wipeable bytes. Note: connecting to a host
+                for the first time now asks you to confirm its key, and old servers may need
+                the new "Allow legacy SHA-1/DSA algorithms" checkbox.</li>
             <li>0.5.0 — Customize the session tree: pick a per-session <b>icon</b> and a
                 <b>color</b> for sessions and folders (tints the icon and name). <b>Rename</b>
                 any session or folder in place with <b>Shift+F6</b>. <b>Type-to-search</b> the

@@ -6,13 +6,14 @@ its dependencies, as of this review.
 **Question answered:** *Can this plugin be secured, and what security issues does
 it have?*
 
-> **Bottom line:** Yes — the plugin **can be secured**. Its credential
-> architecture is already sound (secrets in PasswordSafe, separated from config).
-> The headline risk is that it **disables SSH host-key verification**
-> (`StrictHostKeyChecking=no`), which exposes every connection to
-> man-in-the-middle attacks. That one issue, plus re-enabled legacy crypto and
-> plaintext credential export, are the items to fix. None require an
-> architectural rewrite.
+> **Bottom line:** The plugin **has been secured.** Originally the headline risk
+> was that it **disabled SSH host-key verification** (`StrictHostKeyChecking=no`),
+> exposing every connection to man-in-the-middle attacks; that — plus re-enabled
+> legacy crypto and plaintext credential export — has now been fixed (see the
+> remediation status below). Its credential architecture was already sound
+> (secrets in PasswordSafe, separated from config), so the fixes were additive.
+> This report keeps the original findings for the record, each annotated with its
+> fix.
 
 ---
 
@@ -36,14 +37,15 @@ High/Medium/Low/Info with a developer-tool lens.
 
 ## 2. Findings summary
 
-> **Remediation status:** F1 ✅, F2 ✅, F3 ✅, F5 ✅, F6 ✅ fixed. F4 pending (see note).
+> **Remediation status:** F1 ✅, F2 ✅, F3 ✅, F4 ✅ (hardened), F5 ✅, F6 ✅ — all
+> code-level findings addressed. F7–F9 are informational/ongoing.
 
 | # | Severity | Finding | Threat | Location |
 |---|----------|---------|--------|----------|
 | F1 | ✅ **Fixed** (was High) | SSH host-key verification disabled (`StrictHostKeyChecking=no`); no `known_hosts`, no fingerprint check | T1 | `ssh/SshConnector.kt` |
 | F2 | ✅ **Fixed** (was Medium) | Legacy weak algorithms re-enabled (`ssh-rsa`/SHA-1, `ssh-dss`/DSA) | T1 | `ssh/SshConnector.kt:72–86` |
 | F3 | ✅ **Fixed** (was Medium) | Export can write **plaintext** passwords/passphrases to an unencrypted file | T2 | `ui/ExportOptionsDialog.kt`, `settings/SshSessionTransfer.kt` |
-| F4 | **Low** | Secrets handled as immutable `String` in memory (cannot be wiped) | T3 | `ui/SshSessionDialog.kt`, `ui/JumpHostDialog.kt`, `terminal/SshTerminalManager.kt` |
+| F4 | ✅ **Hardened** (was Low) | Secrets handled as immutable `String` in memory (cannot be wiped) | T3 | `ssh/HopConfig.kt`, `ssh/SshConnector.kt`, `ui/SshSessionDialog.kt`, `ui/JumpHostDialog.kt` |
 | F5 | ✅ **Fixed** (was Low) | Exported file written with default filesystem permissions | T2 | `settings/SshSessionTransfer.kt` |
 | F6 | ✅ **Fixed** (was Low) | Per-session secret cleanup bounded to 16 jump hosts | T2/T3 | `settings/SshCredentialStore.kt`, `ui/SshSessionDialog.kt` |
 | F7 | **Info** | PasswordSafe strength depends on user-chosen backend | T2/T3 | `settings/SshCredentialStore.kt` |
@@ -168,19 +170,20 @@ cloud storage, or emailed.
 - At minimum, write the file with **owner-only permissions** (see F5) and remind
   the user to delete it after transfer.
 
-### F4 — Secrets as immutable `String` in memory (Low)
+### F4 — Secrets as immutable `String` in memory (Low) — ✅ Hardened
 
-Passwords/passphrases are read from `JBPasswordField` (which yields a `char[]`)
-but immediately converted to `String` (e.g. `String(passwordField.password)` in
-`SshSessionDialog.persistSecrets`, `JumpHostDialog.doOKAction`, and the prompt path
-in `SshTerminalManager.resolveHop`). `String`s are immutable and interned in the
-heap until GC, so they **cannot be zeroed** and may surface in heap dumps or swap
-(T3).
+**Status: hardened (partial by design).** Secrets now flow to JSch as **wipeable
+`ByteArray`s**: `HopConfig` carries `password`/`passphrase` as `ByteArray?`,
+`SshConnector` uses `setPassword(byte[])` / `addIdentity(path, byte[])` and zeroes
+every hop's bytes in a `finally` once the chain is established. The dialogs zero
+the transient `char[]` from the password fields after building the stored value
+(`SshSessionDialog.persistSecrets`, `JumpHostDialog.doOKAction`).
 
-**Remediation:** keep secrets as `char[]`/`ByteArray` end-to-end and overwrite
-them after use; pass them to JSch (`setPassword(byte[])` is supported) without an
-intermediate `String`. This is defense-in-depth; on a developer workstation the
-practical risk is modest.
+**Accepted residual:** the secret still exists as a `String` at the platform/JSch
+boundaries we don't control — `PasswordSafe.getPassword()` and
+`Messages.showPasswordDialog()` both return `String`, and JSch keeps its own copy.
+Fully eliminating these would require replacing PasswordSafe as the secret store,
+which is out of proportion to a Low, on-workstation, heap-dump-only risk.
 
 ### F5 — Export file permissions (Low) — ✅ Fixed
 
@@ -229,25 +232,27 @@ against new IDE builds before rollout.
 
 ---
 
-## 4. Prioritized remediation roadmap
+## 4. Remediation roadmap — status
 
-| Priority | Action | Addresses |
-|----------|--------|-----------|
-| **1 (now)** | Implement `known_hosts` + TOFU host-key verification (fingerprint prompt, refuse changed keys) | F1 |
-| **2** | Make legacy SHA-1/DSA algorithms an opt-in per-session toggle | F2 |
-| **3** | Encrypt exported bundles with a passphrase (or drop inline secrets) + owner-only file perms | F3, F5 |
-| **4** | Handle in-memory secrets as `char[]` and zero them after use | F4 |
-| **5** | Clear exactly the stored jump-host secrets (no fixed 16 bound) | F6 |
-| **Ongoing** | Keep JSch/JediTerm updated; run `verifyPlugin` + a dependency scan in CI; document PasswordSafe backend guidance | F7, F8, F9 |
+| Priority | Action | Addresses | Status |
+|----------|--------|-----------|--------|
+| 1 | `known_hosts` + TOFU host-key verification (fingerprint prompt, refuse changed keys) | F1 | ✅ Done |
+| 2 | Make legacy SHA-1/DSA algorithms an opt-in per-session toggle | F2 | ✅ Done |
+| 3 | Encrypt exported bundles with a passphrase + owner-only file perms | F3, F5 | ✅ Done |
+| 4 | Handle in-memory secrets as wipeable bytes; zero after use | F4 | ✅ Done (partial by design) |
+| 5 | Clear exactly the stored jump-host secrets (no fixed 16 bound) | F6 | ✅ Done |
+| Ongoing | Keep JSch/JediTerm updated; run `verifyPlugin` + a dependency scan in CI; document PasswordSafe backend guidance | F7, F8, F9 | Ongoing |
 
 ---
 
 ## 5. Verdict
 
-**Can it be secured? Yes.** The foundations are good: secrets are kept out of
-config and stored in PasswordSafe, there is no injection sink, port forwards are
-loopback-bound, and imports are non-destructive. The work needed is **additive,
-not structural** — chiefly adding host-key verification (F1), tightening crypto
-fallback (F2), and protecting exported secrets (F3). With those addressed,
-HaifaSSH would be safe to use on untrusted networks and meet the expectations of a
-modern SSH client.
+**Secured.** All code-level findings have been remediated: host keys are now
+verified (TOFU) so the plugin is safe on untrusted networks; weak legacy crypto is
+opt-in per host; credential exports are encrypted and owner-only; in-memory secrets
+are passed as wipeable bytes; and jump-host secret cleanup no longer orphans keys.
+The remaining items (F7–F9) are informational/operational — keep dependencies
+updated, run `verifyPlugin` against new IDE builds, and consider a dependency-
+vulnerability scan in CI. The foundations were already sound (secrets in
+PasswordSafe, no injection sink, loopback-only forwards, non-destructive import),
+so the fixes were additive rather than structural.

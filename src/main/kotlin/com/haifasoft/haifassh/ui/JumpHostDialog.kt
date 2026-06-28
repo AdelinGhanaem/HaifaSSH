@@ -88,8 +88,15 @@ class JumpHostDialog(
         entry.host.username = usernameField.text.trim()
         entry.host.authType = authCombo.selectedItem as SshAuthType
         entry.host.privateKeyPath = keyPathField.text.trim()
-        entry.password = String(passwordField.password).ifEmpty { null }
-        entry.passphrase = String(passphraseField.password).ifEmpty { null }
+        val pw = passwordField.password
+        val pp = passphraseField.password
+        try {
+            entry.password = String(pw).ifEmpty { null }
+            entry.passphrase = String(pp).ifEmpty { null }
+        } finally {
+            pw.fill(' ')
+            pp.fill(' ')
+        }
         super.doOKAction()
     }
 

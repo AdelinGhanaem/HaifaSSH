@@ -99,5 +99,7 @@ files that are already bundled inside the ZIP).
 
 - SFTP file browser for the active session
 - ssh-agent / `~/.ssh/config` import
-- Known-hosts verification (currently `StrictHostKeyChecking=no`)
 - Per-session terminal color schemes & startup commands
+
+Host-key verification (trust-on-first-use against a managed `known_hosts`) is
+implemented; see [`docs/04-security-report.md`](docs/04-security-report.md).

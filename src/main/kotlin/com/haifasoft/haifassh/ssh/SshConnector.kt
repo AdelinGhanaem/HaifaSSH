@@ -94,6 +94,9 @@ object SshConnector {
         } catch (t: Throwable) {
             opened.asReversed().forEach { runCatching { it.disconnect() } }
             throw t
+        } finally {
+            // JSch has copied the credentials it needs by now; drop our cleartext.
+            wipeSecrets(chain)
         }
     }
 
@@ -164,13 +167,21 @@ object SshConnector {
                 require(hop.privateKeyPath.isNotBlank()) {
                     "Private key path is required for key authentication (${hop.host})"
                 }
-                if (hop.passphrase.isNullOrEmpty()) {
+                if (hop.passphrase == null || hop.passphrase.isEmpty()) {
                     jsch.addIdentity(hop.privateKeyPath)
                 } else {
                     jsch.addIdentity(hop.privateKeyPath, hop.passphrase)
                 }
                 session.setConfig("PreferredAuthentications", "publickey")
             }
+        }
+    }
+
+    /** Zeroes the in-memory secret bytes for every hop once they're no longer needed. */
+    private fun wipeSecrets(chain: List<HopConfig>) {
+        for (hop in chain) {
+            hop.password?.fill(0)
+            hop.passphrase?.fill(0)
         }
     }
 }

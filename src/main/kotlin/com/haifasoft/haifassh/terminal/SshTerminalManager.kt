@@ -151,7 +151,18 @@ class SshTerminalManager(private val project: Project) {
                 null,
             ) ?: return null // user cancelled
         }
-        return HopConfig(host, port, username, authType, keyPath, resolvedPassword, passphrase, allowLegacy)
+        // Hand the connector wipeable byte arrays. (The source Strings from
+        // PasswordSafe / the prompt are inherent to those platform APIs.)
+        return HopConfig(
+            host,
+            port,
+            username,
+            authType,
+            keyPath,
+            resolvedPassword?.toByteArray(Charsets.UTF_8),
+            passphrase?.toByteArray(Charsets.UTF_8),
+            allowLegacy,
+        )
     }
 
     /**

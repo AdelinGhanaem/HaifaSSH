@@ -96,7 +96,7 @@ Packages (under `com.haifasoft.haifassh`):
 - **`settings/`** — persistence & secrets: `SshSessionService` (the tree),
   `SshSessionState`, `HaifaSshSettings` (prefs + custom scheme),
   `SshCredentialStore` (PasswordSafe), `SshSessionTransfer` + `SshSessionExport`
-  (import/export bundle).
+  (import/export bundle), `ExportCrypto` (AES-GCM encryption of with-secrets exports).
 - **`ssh/`** — transport: `SshConnector` (JSch + jump-host chaining), `HopConfig`
   (a resolved hop), `SshShellHandle` (live PTY + session chain).
 - **`terminal/`** — emulator integration: `SshTerminalManager` (orchestration),
@@ -171,8 +171,9 @@ the right colors. `SchemeColorPalette` supplies the full xterm 256-color palette
   color) → `SshSessionService` → `haifassh-sessions.xml` via the XML serializer.
 - Secrets (passwords, passphrases, per-jump-host secrets) → `SshCredentialStore`
   → PasswordSafe, keyed by session id. They never enter the XML.
-- **Exception:** export *with secrets* deliberately inlines plaintext secrets into
-  the export file, behind an explicit opt-in + warning (see the security report).
+- **Export with secrets:** opt-in, and the bundle is **encrypted** with a user
+  passphrase (AES-256-GCM + PBKDF2, see `ExportCrypto`); the file is also tightened
+  to owner-only permissions. Config-only exports stay plain XML.
 
 ---
 
@@ -201,10 +202,18 @@ the right colors. `SchemeColorPalette` supplies the full xterm 256-color palette
   `LightVirtualFile` lives in the `testFramework` package but is widely used in
   production for in-memory virtual files; it's a pragmatic choice, with the caveat
   that it's a less-guaranteed API surface.
-- **Legacy SHA-1 algorithms are re-enabled as a fallback** (`ssh-rsa`, `ssh-dss`)
-  because the maintained JSch fork drops them and many older servers/appliances
-  still only offer them. Modern algorithms stay first/preferred. This is a
-  deliberate compatibility-vs-security trade-off — discussed in the security report.
+- **Legacy SHA-1/DSA algorithms (`ssh-rsa`, `ssh-dss`) are opt-in per session**
+  (`SshSession.allowLegacyAlgorithms`, off by default). The maintained JSch fork
+  drops them and some old appliances still only offer them, so the user can enable
+  the fallback for a specific host; modern hosts keep a strict set. Secure-by-
+  default compatibility escape hatch (security report F2).
+- **Host keys are verified (TOFU).** A plugin-managed `known_hosts` file +
+  `StrictHostKeyChecking=ask` + an EDT prompt; each hop verified against its real
+  identity via `HostKeyAlias` so tunneled jump hosts verify correctly (security
+  report F1).
+- **Connection secrets are wipeable bytes.** `HopConfig` carries `ByteArray`
+  password/passphrase that `SshConnector` zeroes after the chain is up; dialogs
+  zero the password fields' `char[]` (security report F4, partial by design).
 
 ---
 

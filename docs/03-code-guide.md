@@ -79,11 +79,12 @@ An `object` wrapping `PasswordSafe.instance`. Keys are namespaced
 `HaifaSSH/<sessionId>/password|passphrase` and
 `HaifaSSH/<sessionId>/jump/<index>/password|passphrase` via
 `generateServiceName(...)`. `write` stores `null` for empty strings (so clearing a
-field removes the entry). `clearSession` best-effort wipes a session's secrets up
-to `maxJumpHosts = 16`.
+field removes the entry). `clearSession` wipes a session's secrets up to the shared
+`MAX_TRACKED_JUMP_HOSTS` (= 64) bound — the same constant the dialog's
+leftover-cleanup loop uses, so no per-jump-host secret is ever orphaned.
 
-**Reading note:** the "16" bound appears here and in the dialog's leftover-cleanup
-loop — a known edge case if a session ever had >16 jump hosts.
+**Reading note:** the bound lives in one place (`MAX_TRACKED_JUMP_HOSTS`) and is
+shared by delete and edit-cleanup, so they can't drift out of sync.
 
 ### `HaifaSshSettings.kt` — plugin preferences
 `@Service(APP)` + `@State(... "haifassh-settings.xml")`. Holds `openInEditor`
@@ -95,49 +96,68 @@ change.
 
 ### `SshSessionExport.kt` — the portable bundle
 Transport-only beans: `SshExportBundle` (`formatVersion`, `includesSecrets`,
-folders, sessions), `SshSessionExport` (a session **plus optional inline plaintext
-secrets** and the 0.5.0 `iconKey`/`color`), and `JumpHostExport`. Deliberately
-separate from the live model because a bundle may carry secrets the live model
-never does.
+folders, sessions), `SshSessionExport` (a session **plus optional secrets** and the
+0.5.0 `iconKey`/`color` + `allowLegacyAlgorithms`), and `JumpHostExport`.
+Deliberately separate from the live model because a bundle may carry secrets the
+live model never does.
+
+### `ExportCrypto.kt` — encryption for exported secrets
+An `object` providing authenticated encryption so a with-secrets export is never
+plaintext on disk. AES-256-GCM with a key derived from the user's passphrase via
+PBKDF2-HMAC-SHA256 (210k iterations, random per-file salt + IV). File format:
+`HAIFASSH-ENC-V1\n<base64(salt|iv|ciphertext+tag)>`. `isEncrypted` detects the
+header; `decrypt` throws (GCM tag mismatch) on a wrong passphrase or tampering.
 
 ### `SshSessionTransfer.kt` — import/export logic
-- **`export(path, includeSecrets)`** builds a bundle from the service, copying
-  folder/session fields and (if opted in) pulling secrets from `SshCredentialStore`
-  inline; serializes with `XmlSerializer` + `JDOMUtil.write`.
-- **`import(path)`** deserializes, then **assigns fresh UUIDs** to every folder
-  and session and **remaps parent/folder references** through `folderIdMap`. This
-  makes import a **merge** — it can never clobber an existing session. If the
-  bundle included secrets, they're written to PasswordSafe for the new ids.
+- **`export(path, includeSecrets, passphrase)`** builds a bundle, serializes with
+  `XmlSerializer` + `JDOMUtil.write`; if `includeSecrets`, the XML is
+  **encrypted** via `ExportCrypto` (passphrase required) — otherwise written as
+  plain XML. Then `restrictToOwner` tightens the file to owner-only perms.
+- **`isEncrypted(path)`** lets the UI know whether to prompt for a passphrase.
+- **`import(path, passphrase)`** reads the file, decrypts if it's an encrypted
+  bundle (wrong/missing passphrase → `DecryptionException`), then **assigns fresh
+  UUIDs** to every folder/session and **remaps parent/folder references** through
+  `folderIdMap`. This makes import a **merge** — it can never clobber an existing
+  session. If the bundle included secrets, they're written to PasswordSafe.
 
-**Reading note:** this is the other place the `model ↔ export` field quartet must
-stay in sync; colors/icons are copied in both `toExport` and the import mapper.
+**Reading note:** this is the other place the `model ↔ export` field set must stay
+in sync; colors/icons/`allowLegacyAlgorithms` are copied in both `toExport` and the
+import mapper.
 
 ---
 
 ## `ssh/` — the transport layer (JSch)
 
 ### `HopConfig.kt`
-An immutable `data class`: one fully-resolved hop with secrets already fetched.
-The boundary between "stored config + PasswordSafe" and "ready to connect."
+A `data class`: one fully-resolved hop with secrets already fetched. Secrets are
+held as **`ByteArray?`** (not `String`) so the connector can zero them after use
+(F4 hardening). Carries `allowLegacy` (per-session opt-in to legacy crypto). The
+boundary between "stored config + PasswordSafe" and "ready to connect."
 
 ### `SshConnector.kt` — opening shells & chaining jump hosts
-An `object`. `openShell(chain, termType, columns, rows)`:
+An `object`. `openShell(chain, termType, columns, rows, hostKeyPrompt)`:
 
-1. Iterates the hop chain. Hop 0 connects directly; each later hop is reached via
+1. `jsch.setKnownHosts(...)` points at the plugin-managed known_hosts file.
+2. Iterates the hop chain. Hop 0 connects directly; each later hop is reached via
    `previous.setPortForwardingL("127.0.0.1", 0, hop.host, hop.port)` (loopback
    ephemeral port) — this is the ProxyJump mechanism.
-2. Per hop: `applyAuth` (password → `setPassword` + `PreferredAuthentications=
-   password,keyboard-interactive`; key → `jsch.addIdentity(path[, passphrase])` +
-   `PreferredAuthentications=publickey`), then `StrictHostKeyChecking=no`,
-   `enableLegacyAlgorithms`, keep-alive, `connect(timeout)`.
-3. Opens a `shell` `ChannelShell` with a PTY, returns an `SshShellHandle`.
-4. On any failure, disconnects every opened session in reverse order.
+3. Per hop: `applyAuth` (password → `setPassword(byte[])` + `PreferredAuthentications=
+   password,keyboard-interactive`; key → `jsch.addIdentity(path[, byte[] passphrase])`
+   + `PreferredAuthentications=publickey`); then **host-key verification** —
+   `hostKeyAlias` = the hop's real identity, `userInfo` = the TOFU prompt adapter,
+   `StrictHostKeyChecking=ask`; `if (hop.allowLegacy) enableLegacyAlgorithms`;
+   keep-alive; `connect(timeout)`.
+4. Opens a `shell` `ChannelShell` with a PTY, returns an `SshShellHandle`.
+5. On any failure, disconnects every opened session in reverse order; a `finally`
+   zeroes every hop's secret bytes once JSch has copied what it needs.
 
-**`enableLegacyAlgorithms` / `mergeAlgorithms`** append `ssh-rsa`/`ssh-dss` to
-`server_host_key` and `PubkeyAcceptedAlgorithms` *after* the modern entries (so
-they're fallback-only). **Security-critical reading:** lines 40
-(`StrictHostKeyChecking=no`) and 72–86 (legacy algos) are the two findings in the
-security report — see [04-security-report.md](04-security-report.md).
+**Host-key verification (F1).** `HostKeyPrompt` (implemented by `SshTerminalManager`
+on the EDT) is bridged to JSch via the private `HostKeyUserInfo`; `knownHostsAlias`
+yields `host` (port 22) or `[host]:port` (otherwise). Because JSch uses the alias
+**verbatim** as the known_hosts key, verification stays correct/stable even for
+tunneled jump hosts. **`enableLegacyAlgorithms` / `mergeAlgorithms`** append
+`ssh-rsa`/`ssh-dss` after the modern entries, and now run **only when the session
+opted in** (F2). See [04-security-report.md](04-security-report.md).
 
 ### `SshShellHandle.kt`
 Owns the live `ChannelShell` and the whole `Session` chain. Exposes
@@ -163,7 +183,11 @@ The hub that turns a `SshSession` into a visible terminal.
   ties a per-tab `Disposer.newDisposable(...)` lifetime, and on content disposal
   closes the widget, the lifetime, and the handle.
 - **`resolveHop`** is the password-prompt-or-fail helper; returns `null` if the
-  user cancels (which aborts the whole connect).
+  user cancels (which aborts the whole connect). It packs secrets into
+  `HopConfig` as wipeable `ByteArray`s and propagates `allowLegacyAlgorithms`.
+- **`hostKeyPrompt()`** supplies the `SshConnector.HostKeyPrompt`: it shows the
+  trust-on-first-use dialog (and the changed-key warning) on the EDT via
+  `invokeAndWait`, while the connection itself stays on the background thread.
 
 ### `SshTtyConnector.kt` — JediTerm ⇄ SSH bridge
 Implements JediTerm's `TtyConnector` over the handle's streams: `read` from the
@@ -256,22 +280,27 @@ context menu, in-place rename, speed search, and a custom renderer.
 
 ### `SshSessionDialog.kt` — create/edit a session
 A `DialogWrapper`. Builds the form with `FormBuilder` (name/host/port/user/auth/
-password/key/passphrase, store-credentials checkbox, **Icon** combo + **Color**
-`ColorPanel` with a *Default* reset, jump-host list via `ToolbarDecorator`).
-`updateAuthFields` enables password vs. key fields. `doValidate` enforces host/
-user/key-path. **`persist(service)`** writes non-secret fields (incl. `iconKey`/
-`color`) via `upsertSession`, then `persistSecrets` writes password/passphrase
-(and per-jump-host secrets) to PasswordSafe — or nulls them when *store
-credentials* is off — and clears leftover jump-host secrets (the 16-slot loop).
+password/key/passphrase, store-credentials checkbox, the **Allow legacy SHA-1/DSA
+algorithms** checkbox (F2), **Icon** combo + **Color** `ColorPanel` with a
+*Default* reset, jump-host list via `ToolbarDecorator`). `updateAuthFields` enables
+password vs. key fields. `doValidate` enforces host/user/key-path.
+**`persist(service)`** writes non-secret fields (incl. `iconKey`/`color`/
+`allowLegacyAlgorithms`) via `upsertSession`, then `persistSecrets` writes
+password/passphrase (and per-jump-host secrets) to PasswordSafe — or nulls them
+when *store credentials* is off — zeroing the transient `char[]` from the password
+fields afterward (F4), and clears leftover jump-host slots up to
+`MAX_TRACKED_JUMP_HOSTS` (F6).
 
 ### `JumpHostDialog.kt`
 `JumpHostEntry` bundles a `JumpHost` with its in-memory secrets while editing. The
-dialog edits one hop; `doOKAction` writes the fields back into the entry (secrets
-kept in memory until the parent session is persisted).
+dialog edits one hop; `doOKAction` writes the fields back into the entry (and zeroes
+the password-field `char[]` after use); secrets stay in memory until the parent
+session is persisted.
 
 ### `ExportOptionsDialog.kt`
-Asks how many sessions to export and whether to include secrets, with a prominent
-**plaintext** warning. Exposes `includeSecrets`.
+Asks how many sessions to export and whether to include secrets. When secrets are
+included it requires a **passphrase (+confirm)** — the bundle is then encrypted
+(F3). Exposes `includeSecrets` and `passphrase`.
 
 ### `TerminalAppearanceConfigurable.kt`
 The *Settings → Tools → HaifaSSH Terminal* page (`Configurable`). A scheme combo,

@@ -195,8 +195,15 @@ class SshSessionDialog(
     private fun persistSecrets(saved: SshSession) {
         val store = SshCredentialStore
         if (saved.savePassword) {
-            store.setPassword(saved.id, String(passwordField.password).takeIf { saved.authType == SshAuthType.PASSWORD })
-            store.setPassphrase(saved.id, String(passphraseField.password).takeIf { saved.authType == SshAuthType.KEY })
+            val pw = passwordField.password
+            val pp = passphraseField.password
+            try {
+                store.setPassword(saved.id, String(pw).takeIf { saved.authType == SshAuthType.PASSWORD })
+                store.setPassphrase(saved.id, String(pp).takeIf { saved.authType == SshAuthType.KEY })
+            } finally {
+                pw.fill(' ')
+                pp.fill(' ')
+            }
         } else {
             store.setPassword(saved.id, null)
             store.setPassphrase(saved.id, null)
