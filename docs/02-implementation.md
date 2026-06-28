@@ -207,10 +207,16 @@ the right colors. `SchemeColorPalette` supplies the full xterm 256-color palette
   drops them and some old appliances still only offer them, so the user can enable
   the fallback for a specific host; modern hosts keep a strict set. Secure-by-
   default compatibility escape hatch (security report F2).
-- **Host keys are verified (TOFU).** A plugin-managed `known_hosts` file +
-  `StrictHostKeyChecking=ask` + an EDT prompt; each hop verified against its real
-  identity via `HostKeyAlias` so tunneled jump hosts verify correctly (security
-  report F1).
+- **Host keys are verified (TOFU).** `StrictHostKeyChecking=ask` + an EDT prompt;
+  each hop verified against its real identity via `HostKeyAlias` so tunneled jump
+  hosts verify correctly (security report F1). A `CompositeHostKeyRepository` reads
+  both the user's `~/.ssh/known_hosts` (prioritized) and a plugin-managed file;
+  new acceptances are written only to the plugin file (the system file is never
+  modified).
+- **Terminal scrollback is configurable** (`HaifaSshSettings.terminalBufferMaxLines`,
+  surfaced in the settings page and read by `IdeTerminalSettingsProvider.getBufferMaxLinesCount`).
+  Raise it to keep large outputs (e.g. `tail -f -n 10000`) fully scrollable; it
+  applies to terminals opened after the change.
 - **Connection secrets are wipeable bytes.** `HopConfig` carries `ByteArray`
   password/passphrase that `SshConnector` zeroes after the chain is up; dialogs
   zero the password fields' `char[]` (security report F4, partial by design).

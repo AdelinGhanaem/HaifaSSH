@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.haifasoft.haifassh</id>
     <name>HaifaSSH - SSH Session Manager</name>
-    <version>0.6.0</version>
+    <version>0.7.0</version>
     <vendor email="a.ganayem@haifasoft.com" url="https://haifasoft.com">HaifaSoft</vendor>
 
     <description><![CDATA[
@@ -19,6 +19,12 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.7.0 — <b>Configurable scrollback</b>: set how many lines each terminal keeps
+                (Settings → Tools → HaifaSSH Terminal), so large outputs like
+                <code>tail -f -n 10000</code> stay fully scrollable. Host-key verification now
+                also reads your existing <b>~/.ssh/known_hosts</b> (prioritized), so hosts you
+                already trust in OpenSSH connect without an extra prompt; newly accepted keys
+                are still written to the plugin's own file (your system file is never modified).</li>
             <li>0.6.0 — <b>Security hardening.</b> SSH host keys are now <b>verified</b>
                 (trust-on-first-use against a managed known_hosts; changed keys warn and
                 default to abort) — previously host-key checking was disabled. Weak legacy

@@ -2,6 +2,7 @@ package com.haifasoft.haifassh.ssh
 
 import com.intellij.openapi.application.PathManager
 import com.jcraft.jsch.ChannelShell
+import com.jcraft.jsch.HostKeyRepository
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
 import com.jcraft.jsch.UserInfo
@@ -52,7 +53,7 @@ object SshConnector {
         require(chain.isNotEmpty()) { "Connection chain must contain at least the target host" }
 
         val jsch = JSch()
-        jsch.setKnownHosts(knownHostsFile())
+        jsch.hostKeyRepository = buildHostKeyRepository()
         val userInfo = HostKeyUserInfo(hostKeyPrompt)
         val opened = ArrayList<Session>(chain.size)
         try {
@@ -126,16 +127,42 @@ object SshConnector {
     }
 
     /**
-     * The plugin-managed `known_hosts` file under the IDE config directory. Kept
-     * separate from `~/.ssh/known_hosts` so the plugin never rewrites the user's
-     * system file. Created empty on first use so JSch can load and later sync it.
+     * Host-key repository that reads from both the user's `~/.ssh/known_hosts`
+     * (priority) and the plugin-managed file, and writes newly trusted keys to
+     * the plugin file only — so an existing OpenSSH known_hosts entry is honored
+     * without prompting, and the user's system file is never modified.
      */
-    private fun knownHostsFile(): String {
+    private fun buildHostKeyRepository(): HostKeyRepository {
+        val writable = loadKnownHosts(pluginKnownHostsFile())
+        val system = systemKnownHostsFile()?.let { runCatching { loadKnownHosts(it) }.getOrNull() }
+        return CompositeHostKeyRepository(writable, listOfNotNull(system))
+    }
+
+    /** Loads (or creates) a single known_hosts file into its own JSch repository. */
+    private fun loadKnownHosts(path: String): HostKeyRepository {
+        val jsch = JSch()
+        jsch.setKnownHosts(path)
+        return jsch.hostKeyRepository
+    }
+
+    /**
+     * The plugin-managed `known_hosts` file under the IDE config directory.
+     * Created empty on first use so JSch can load and later sync it; this is
+     * where trust-on-first-use acceptances are stored.
+     */
+    private fun pluginKnownHostsFile(): String {
         val dir = Path.of(PathManager.getConfigPath(), "haifassh")
         Files.createDirectories(dir)
         val file = dir.resolve("known_hosts")
         if (Files.notExists(file)) Files.createFile(file)
         return file.toString()
+    }
+
+    /** The user's OpenSSH `~/.ssh/known_hosts` (works on Windows too), or null if absent. */
+    private fun systemKnownHostsFile(): String? {
+        val home = System.getProperty("user.home") ?: return null
+        val file = Path.of(home, ".ssh", "known_hosts")
+        return if (Files.isReadable(file)) file.toString() else null
     }
 
     /** OpenSSH-style host identity: `host` for port 22, `[host]:port` otherwise. */

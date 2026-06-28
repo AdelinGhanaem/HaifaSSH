@@ -63,6 +63,13 @@ class HaifaSshSettingsState {
 
     /** The user's editable scheme, used when [terminalSchemeName] is "Custom". */
     var custom: StoredScheme = StoredScheme()
+
+    /**
+     * Maximum scrollback lines kept per terminal (JediTerm history buffer).
+     * Higher = more history retained (e.g. for `tail -f -n 10000`), at more
+     * memory. Applies to terminals opened after the change.
+     */
+    var terminalBufferMaxLines: Int = 5000
 }
 
 /**
@@ -93,6 +100,13 @@ class HaifaSshSettings : PersistentStateComponent<HaifaSshSettingsState> {
             state.terminalSchemeName = value
         }
 
+    /** Clamped to a sane range; see [HaifaSshSettingsState.terminalBufferMaxLines]. */
+    var terminalBufferMaxLines: Int
+        get() = state.terminalBufferMaxLines.coerceIn(MIN_BUFFER_LINES, MAX_BUFFER_LINES)
+        set(value) {
+            state.terminalBufferMaxLines = value.coerceIn(MIN_BUFFER_LINES, MAX_BUFFER_LINES)
+        }
+
     fun customScheme(): TerminalColorScheme = state.custom.toScheme()
 
     fun setCustomScheme(scheme: TerminalColorScheme) {
@@ -109,6 +123,9 @@ class HaifaSshSettings : PersistentStateComponent<HaifaSshSettingsState> {
     }
 
     companion object {
+        const val MIN_BUFFER_LINES = 100
+        const val MAX_BUFFER_LINES = 1_000_000
+
         @JvmField
         val SCHEME_TOPIC: Topic<SchemeListener> =
             Topic.create("HaifaSSH terminal scheme changed", SchemeListener::class.java)

@@ -4,6 +4,7 @@ import com.jediterm.terminal.TerminalColor
 import com.jediterm.terminal.TextStyle
 import com.jediterm.terminal.emulator.ColorPalette
 import com.jediterm.terminal.ui.settings.DefaultSettingsProvider
+import com.haifasoft.haifassh.settings.HaifaSshSettings
 import com.haifasoft.haifassh.terminal.theme.SchemeColorPalette
 import com.haifasoft.haifassh.terminal.theme.TerminalSchemes
 import com.haifasoft.haifassh.terminal.theme.toTerminalColor
@@ -34,4 +35,8 @@ class IdeTerminalSettingsProvider : DefaultSettingsProvider() {
     // Use our explicit selection colors instead of inverting fg/bg (which rendered
     // selections as a near-black block on dark themes).
     override fun useInverseSelectionColor(): Boolean = false
+
+    // User-configurable scrollback (history) size, read when a terminal is created
+    // so a large value can hold, e.g., the full output of `tail -f -n 10000`.
+    override fun getBufferMaxLinesCount(): Int = HaifaSshSettings.getInstance().terminalBufferMaxLines
 }

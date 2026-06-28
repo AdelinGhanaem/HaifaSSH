@@ -88,11 +88,12 @@ shared by delete and edit-cleanup, so they can't drift out of sync.
 
 ### `HaifaSshSettings.kt` — plugin preferences
 `@Service(APP)` + `@State(... "haifassh-settings.xml")`. Holds `openInEditor`
-(terminal placement), `terminalSchemeName` (active scheme), and `custom`
+(terminal placement), `terminalSchemeName` (active scheme), `custom`
 (`StoredScheme` — the editable scheme as hex strings, with sane defaults and a
-`toScheme()`/`copyFrom()` bridge to the runtime `TerminalColorScheme`). Defines
-`SCHEME_TOPIC` + `fireSchemeChanged()` so open terminals repaint when colors
-change.
+`toScheme()`/`copyFrom()` bridge to the runtime `TerminalColorScheme`), and
+`terminalBufferMaxLines` (scrollback size, clamped to `MIN_BUFFER_LINES..MAX_BUFFER_LINES`).
+Defines `SCHEME_TOPIC` + `fireSchemeChanged()` so open terminals repaint when
+colors change.
 
 ### `SshSessionExport.kt` — the portable bundle
 Transport-only beans: `SshExportBundle` (`formatVersion`, `includesSecrets`,
@@ -137,7 +138,8 @@ boundary between "stored config + PasswordSafe" and "ready to connect."
 ### `SshConnector.kt` — opening shells & chaining jump hosts
 An `object`. `openShell(chain, termType, columns, rows, hostKeyPrompt)`:
 
-1. `jsch.setKnownHosts(...)` points at the plugin-managed known_hosts file.
+1. `jsch.hostKeyRepository = buildHostKeyRepository()` — a `CompositeHostKeyRepository`
+   over the user's `~/.ssh/known_hosts` (priority) and the plugin-managed file.
 2. Iterates the hop chain. Hop 0 connects directly; each later hop is reached via
    `previous.setPortForwardingL("127.0.0.1", 0, hop.host, hop.port)` (loopback
    ephemeral port) — this is the ProxyJump mechanism.
@@ -155,9 +157,20 @@ An `object`. `openShell(chain, termType, columns, rows, hostKeyPrompt)`:
 on the EDT) is bridged to JSch via the private `HostKeyUserInfo`; `knownHostsAlias`
 yields `host` (port 22) or `[host]:port` (otherwise). Because JSch uses the alias
 **verbatim** as the known_hosts key, verification stays correct/stable even for
-tunneled jump hosts. **`enableLegacyAlgorithms` / `mergeAlgorithms`** append
-`ssh-rsa`/`ssh-dss` after the modern entries, and now run **only when the session
-opted in** (F2). See [04-security-report.md](04-security-report.md).
+tunneled jump hosts. `buildHostKeyRepository` reads both `~/.ssh/known_hosts`
+(via `systemKnownHostsFile`, prioritized) and the plugin file
+(`pluginKnownHostsFile`); new acceptances are written to the plugin file only.
+**`enableLegacyAlgorithms` / `mergeAlgorithms`** append `ssh-rsa`/`ssh-dss` after
+the modern entries, and now run **only when the session opted in** (F2). See
+[04-security-report.md](04-security-report.md).
+
+### `CompositeHostKeyRepository.kt`
+A `HostKeyRepository` that verifies against several backing repositories (OpenSSH
+semantics: trusted if **any** contains the key). Read-only sources (the system
+`~/.ssh/known_hosts`) are checked first and never modified; the `writable` repo
+(the plugin file) receives new trust-on-first-use and changed-key updates.
+`check` returns OK on any match, else CHANGED if a repo knew the host with a
+different key, else NOT_INCLUDED.
 
 ### `SshShellHandle.kt`
 Owns the live `ChannelShell` and the whole `Session` chain. Exposes
@@ -212,7 +225,9 @@ super constructor.
 Extends JediTerm's `DefaultSettingsProvider`; returns default fg/bg, the
 `SchemeColorPalette`, and explicit selection colors from the **active** scheme
 (read live every call). `useInverseSelectionColor() = false` so selections use our
-colors rather than inverting (which looked near-black on dark themes).
+colors rather than inverting. `getBufferMaxLinesCount()` returns the user's
+configured scrollback (`HaifaSshSettings.terminalBufferMaxLines`), read when each
+terminal is created.
 
 ### `SshTerminalsToolWindowFactory.kt`
 The bottom tool window. Intentionally empty — tabs are created on demand by
@@ -303,7 +318,8 @@ included it requires a **passphrase (+confirm)** — the bundle is then encrypte
 (F3). Exposes `includeSecrets` and `passphrase`.
 
 ### `TerminalAppearanceConfigurable.kt`
-The *Settings → Tools → HaifaSSH Terminal* page (`Configurable`). A scheme combo,
+The *Settings → Tools → HaifaSSH Terminal* page (`Configurable`). A **Scrollback
+(lines)** spinner (`bufferLinesSpinner` → `terminalBufferMaxLines`), a scheme combo,
 *Copy to Custom*, `ColorPanel`s for bg/fg/selection/cursor + a 16-cell ANSI grid,
 and a live `SchemePreview` (paints a sample shell line, colored tokens, and a
 selection block). `isModified/apply/reset` follow the standard `Configurable`

@@ -3,6 +3,7 @@ package com.haifasoft.haifassh.ui
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.ColorPanel
+import com.intellij.ui.JBIntSpinner
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.ui.FormBuilder
@@ -31,6 +32,12 @@ class TerminalAppearanceConfigurable : Configurable {
     private val settings = HaifaSshSettings.getInstance()
 
     private val schemeCombo = ComboBox(TerminalSchemes.names().toTypedArray())
+    private val bufferLinesSpinner = JBIntSpinner(
+        5000,
+        HaifaSshSettings.MIN_BUFFER_LINES,
+        HaifaSshSettings.MAX_BUFFER_LINES,
+        500,
+    )
     private val preview = SchemePreview()
 
     private val background = ColorPanel()
@@ -74,6 +81,12 @@ class TerminalAppearanceConfigurable : Configurable {
         }
 
         val form = FormBuilder.createFormBuilder()
+            .addLabeledComponent("Scrollback (lines):", bufferLinesSpinner)
+            .addComponent(
+                JBLabel("Per terminal; applies to newly opened terminals. Higher keeps more history but uses more memory.")
+                    .apply { foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND },
+            )
+            .addSeparator()
             .addLabeledComponent("Color scheme:", schemeCombo)
             .addComponent(copyToCustomButton)
             .addSeparator()
@@ -134,6 +147,7 @@ class TerminalAppearanceConfigurable : Configurable {
     private fun rgb(panel: ColorPanel, fallback: Int): Int = panel.selectedColor?.toRgbInt() ?: fallback
 
     override fun isModified(): Boolean {
+        if (bufferLinesSpinner.number != settings.terminalBufferMaxLines) return true
         if (selectedName() != settings.terminalSchemeName) return true
         if (selectedName() == TerminalSchemes.CUSTOM) {
             return !sameColors(readUiScheme(), settings.customScheme())
@@ -142,6 +156,7 @@ class TerminalAppearanceConfigurable : Configurable {
     }
 
     override fun apply() {
+        settings.terminalBufferMaxLines = bufferLinesSpinner.number
         settings.terminalSchemeName = selectedName()
         if (selectedName() == TerminalSchemes.CUSTOM) {
             settings.setCustomScheme(readUiScheme())
@@ -150,6 +165,7 @@ class TerminalAppearanceConfigurable : Configurable {
     }
 
     override fun reset() {
+        bufferLinesSpinner.value = settings.terminalBufferMaxLines
         schemeCombo.selectedItem = settings.terminalSchemeName
         onSchemeSelected(settings.terminalSchemeName)
     }
