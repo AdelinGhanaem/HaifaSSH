@@ -35,6 +35,12 @@ class SshSessionDialog(
     private val project: Project,
     private val session: SshSession,
     private val isNew: Boolean,
+    /**
+     * Session id to pre-fill password/passphrase and jump-host secrets from. Used
+     * by "Duplicate": [isNew] is true (saving creates a new session) but the
+     * secret fields are seeded from the original session's stored credentials.
+     */
+    private val prefillSecretsFrom: String? = null,
 ) : DialogWrapper(project) {
 
     private val nameField = JBTextField(session.name)
@@ -78,7 +84,11 @@ class SshSessionDialog(
     }
 
     init {
-        title = if (isNew) "New SSH Session" else "Edit SSH Session"
+        title = when {
+            isNew && prefillSecretsFrom != null -> "Duplicate SSH Session"
+            isNew -> "New SSH Session"
+            else -> "Edit SSH Session"
+        }
 
         keyPathField.addBrowseFolderListener(
             "Select Private Key",
@@ -87,15 +97,18 @@ class SshSessionDialog(
             FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor(),
         )
 
-        if (!isNew) {
-            passwordField.text = SshCredentialStore.getPassword(session.id) ?: ""
-            passphraseField.text = SshCredentialStore.getPassphrase(session.id) ?: ""
+        // Where to read existing secrets from: an explicit source (Duplicate) or,
+        // when editing, the session's own id. New sessions start blank.
+        val secretSource = prefillSecretsFrom ?: session.id.takeIf { !isNew }
+        if (secretSource != null) {
+            passwordField.text = SshCredentialStore.getPassword(secretSource) ?: ""
+            passphraseField.text = SshCredentialStore.getPassphrase(secretSource) ?: ""
             session.jumpHosts.forEachIndexed { index, jump ->
                 jumpModel.add(
                     JumpHostEntry(
                         host = jump.copyOf(),
-                        password = SshCredentialStore.getJumpPassword(session.id, index),
-                        passphrase = SshCredentialStore.getJumpPassphrase(session.id, index),
+                        password = SshCredentialStore.getJumpPassword(secretSource, index),
+                        passphrase = SshCredentialStore.getJumpPassphrase(secretSource, index),
                     ),
                 )
             }

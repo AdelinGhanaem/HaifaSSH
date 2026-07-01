@@ -287,7 +287,9 @@ context menu, in-place rename, speed search, and a custom renderer.
 - **Selection helpers** — plus `targetFolderId` (where new items go),
   `selectSession`/`selectFolder`, and `reselect(sessionIds, folderIds)` to restore
   a multi-selection after a service rebuild.
-- **Actions** — `addSession`/`editSelected`/`connectSelected` (single-item),
+- **Actions** — `addSession`/`editSelected`/`connectSelected`/`duplicateSelected`
+  (single-item; `duplicateSelected` copies the session with a blank id + " (copy)"
+  name and opens the dialog with `prefillSecretsFrom = original.id`),
   `removeSelected` (**bulk** delete of all selected, with a counted confirm),
   `addFolder`, `import/exportSessions`, and the **bulk** appearance ops:
   `setColorSelected` (one `ColorChooser` applied to every selected session *or*
@@ -311,6 +313,9 @@ password/key/passphrase, store-credentials checkbox, the **Allow legacy SHA-1/DS
 algorithms** checkbox (F2), **Icon** combo + **Color** `ColorPanel` with a
 *Default* reset, jump-host list via `ToolbarDecorator`). `updateAuthFields` enables
 password vs. key fields. `doValidate` enforces host/user/key-path.
+The optional `prefillSecretsFrom` id seeds the password/passphrase and jump-host
+secret fields from another session (used by **Duplicate**, where `isNew=true` so
+saving creates a fresh session but the fields come from the original).
 **`persist(service)`** writes non-secret fields (incl. `iconKey`/`color`/
 `allowLegacyAlgorithms`) via `upsertSession`, then `persistSecrets` writes
 password/passphrase (and per-jump-host secrets) to PasswordSafe — or nulls them

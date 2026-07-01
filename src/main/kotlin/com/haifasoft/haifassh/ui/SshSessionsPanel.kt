@@ -320,6 +320,20 @@ class SshSessionsPanel(
         selectedSession()?.let { SshTerminalManager.getInstance(project).connect(it) }
     }
 
+    /** Opens a pre-filled "Duplicate" dialog for the selected session (secrets included). */
+    private fun duplicateSelected() {
+        val original = selectedSession() ?: return
+        val copy = original.copyOf().apply {
+            id = "" // blank → upsertSession assigns a fresh id, creating a new session
+            name = "${original.name.ifBlank { original.displayName() }} (copy)"
+        }
+        val dialog = SshSessionDialog(project, copy, isNew = true, prefillSecretsFrom = original.id)
+        if (dialog.showAndGet()) {
+            val saved = dialog.persist(service)
+            selectSession(saved.id)
+        }
+    }
+
     private fun exportSessions() {
         val count = service.sessions().size
         if (count == 0) {
@@ -493,7 +507,11 @@ class SshSessionsPanel(
 
     private fun installContextMenu() {
         val group = DefaultActionGroup().apply {
+            add(NewSessionHereAction())
+            add(NewSubfolderAction())
+            addSeparator()
             add(ConnectAction())
+            add(DuplicateAction())
             addSeparator()
             add(RenameAction())
             add(SetColorAction())
@@ -523,12 +541,56 @@ class SshSessionsPanel(
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
     }
 
+    private inner class DuplicateAction : DumbAwareAction(
+        "Duplicate…",
+        "Create a copy of the selected session, pre-filled with all its settings",
+        AllIcons.Actions.Copy,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = duplicateSelected()
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = selectedNodes().size == 1 && selectedSession() != null
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
     private inner class NewFolderAction : DumbAwareAction(
         "New Folder",
         "Create a folder",
         AllIcons.Actions.NewFolder,
     ) {
         override fun actionPerformed(e: AnActionEvent) = addFolder()
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    /** Folder-only context action: add a new session inside the selected folder. */
+    private inner class NewSessionHereAction : DumbAwareAction(
+        "New Session Here",
+        "Add a new SSH session inside the selected folder",
+        AllIcons.General.Add,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = addSession()
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabledAndVisible = selectedNodes().size == 1 && selectedFolder() != null
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    /** Folder-only context action: add a subfolder inside the selected folder. */
+    private inner class NewSubfolderAction : DumbAwareAction(
+        "New Subfolder",
+        "Create a folder inside the selected folder",
+        AllIcons.Actions.NewFolder,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = addFolder()
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabledAndVisible = selectedNodes().size == 1 && selectedFolder() != null
+        }
 
         override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
     }

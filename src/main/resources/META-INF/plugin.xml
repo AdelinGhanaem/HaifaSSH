@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.haifasoft.haifassh</id>
     <name>HaifaSSH - SSH Session Manager</name>
-    <version>0.8.0</version>
+    <version>0.10.0</version>
     <vendor email="a.ganayem@haifasoft.com" url="https://haifasoft.com">HaifaSoft</vendor>
 
     <description><![CDATA[
@@ -19,6 +19,14 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.10.0 — <b>Folder right-click actions</b>: right-click a folder for
+                <em>New Session Here</em> and <em>New Subfolder</em> — both create the new item
+                directly inside the folder you clicked, so you can build out a session tree
+                without dragging things around afterwards.</li>
+            <li>0.9.0 — <b>Duplicate session</b>: right-click a session → <em>Duplicate…</em> to
+                open a pre-filled New Session dialog with every field copied — host, port, auth,
+                private key, jump hosts, icon/color, and the saved password/passphrase — so you
+                can tweak one thing and save it as a new connection.</li>
             <li>0.8.0 — <b>Multi-select bulk edits</b>: select multiple sessions (or multiple
                 folders) with Ctrl/Shift-click and change them together — set the same color,
                 set the same icon (sessions), or delete them all at once. A selection stays to

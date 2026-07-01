@@ -18,6 +18,11 @@ keep credentials in the IDE Password Safe.
 - **Multi-select bulk edits** — Ctrl/Shift-click to select several sessions (or several
   folders) and change them together: set the same color, set the same icon (sessions),
   or delete them all at once. A selection stays to one kind for unambiguous bulk actions.
+- **Duplicate a session** — right-click → *Duplicate…* opens a new-session dialog with
+  every field pre-filled (host, port, auth, key, jump hosts, icon/color, and the saved
+  password/passphrase), so you can tweak one detail and save it as a new connection.
+- **Build the tree from a folder** — right-click a folder for *New Session Here* and
+  *New Subfolder*; both create the new item directly inside that folder.
 - **In-place rename** — press **Shift+F6** on any folder or session to rename it right in
   the tree, just like renaming a symbol; **Esc** cancels.
 - **Quick search** — start typing in the tree to find and jump to a session/folder by name.
