@@ -84,19 +84,19 @@ class SshTerminalManager(private val project: Project) {
 
         // Tie the widget's theme-listener lifetime to the content; disposed when the tab closes.
         val lifetime = Disposer.newDisposable("HaifaSSH terminal ${session.displayName()}")
-        val widget = SshTerminalUi.createWidget(session, handle, lifetime)
+        val pane = SshTerminalUi.createPane(project, session, handle, lifetime)
 
-        val content = ContentFactory.getInstance().createContent(widget, session.displayName(), false)
+        val content = ContentFactory.getInstance().createContent(pane.component, session.displayName(), false)
         content.isCloseable = true
         content.setDisposer(Disposable {
-            runCatching { widget.close() }
+            runCatching { pane.dispose() }
             Disposer.dispose(lifetime)
             handle.close()
         })
 
         toolWindow.contentManager.addContent(content)
         toolWindow.contentManager.setSelectedContent(content)
-        toolWindow.activate { widget.requestFocusInWindow() }
+        toolWindow.activate { pane.preferredFocus.requestFocusInWindow() }
     }
 
     private fun buildChain(session: SshSession): List<HopConfig>? {

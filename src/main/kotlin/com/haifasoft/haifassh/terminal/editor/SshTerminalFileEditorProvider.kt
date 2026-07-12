@@ -17,7 +17,7 @@ class SshTerminalFileEditorProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile): Boolean = file is SshTerminalVirtualFile
 
     override fun createEditor(project: Project, file: VirtualFile): FileEditor =
-        SshTerminalFileEditor(file as SshTerminalVirtualFile)
+        SshTerminalFileEditor(project, file as SshTerminalVirtualFile)
 
     override fun getEditorTypeId(): String = "haifassh-terminal"
 
