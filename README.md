@@ -1,14 +1,14 @@
 # HaifaSSH — SSH Session Manager for JetBrains IDEs
 
-A MobaXterm-style SSH workflow embedded in IntelliJ-based IDEs: organize SSH
+A fast, tabbed SSH session manager embedded in IntelliJ-based IDEs: organize SSH
 sessions in a folder tree, connect to an interactive terminal in one click, and
-keep credentials in the IDE Password Safe.
+keep credentials in the IDE Password Safe. Free and open source (MIT).
 
 > **📚 Documentation:** see [`docs/`](docs/README.md) — the IntelliJ plugin
 > system, how this plugin is implemented, a file-by-file code guide, and a full
 > security report.
 
-## Features (v0.5.0)
+## Features (v0.11.1)
 
 - **Session tree** — folders + sessions in the left-hand *SSH Sessions* tool window.
 - **Customizable appearance** — give each session a built-in **icon** (server, database,
@@ -69,7 +69,7 @@ keep credentials in the IDE Password Safe.
 After `buildPlugin`, install this file:
 
 ```
-build/distributions/haifassh-0.5.0.zip
+build/distributions/haifassh-0.11.1.zip
 ```
 
 In the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…**, then select

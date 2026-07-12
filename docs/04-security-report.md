@@ -1,6 +1,8 @@
 # HaifaSSH — Security Report
 
-**Subject:** HaifaSSH SSH Session Manager plugin (v0.5.0)
+**Subject:** HaifaSSH SSH Session Manager plugin (findings identified at the v0.5.0
+baseline; all remediations landed in the v0.6.0 security release and remain in place
+as of v0.11.1)
 **Scope:** the plugin source under `src/main/kotlin/com/haifasoft/haifassh/` and
 its dependencies, as of this review.
 **Question answered:** *Can this plugin be secured, and what security issues does

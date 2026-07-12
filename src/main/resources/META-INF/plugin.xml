@@ -1,20 +1,50 @@
 <idea-plugin>
     <id>com.haifasoft.haifassh</id>
     <name>HaifaSSH - SSH Session Manager</name>
-    <version>0.10.0</version>
+    <!-- version is injected at build time from gradle.properties (pluginVersion) via patchPluginXml -->
     <vendor email="a.ganayem@haifasoft.com" url="https://haifasoft.com">HaifaSoft</vendor>
 
     <description><![CDATA[
-        <h2>HaifaSSH — SSH session manager for JetBrains IDEs</h2>
-        <p>A MobaXterm-style SSH workflow built into the IDE:</p>
+        <h2>HaifaSSH — a full SSH session manager, built into your IDE</h2>
+
+        <p>Stop juggling a separate terminal app. HaifaSSH brings a fast, organized,
+        multi-tab SSH workflow right into your JetBrains IDE — connect to all your servers
+        from a session tree, open real interactive shells in tabs, and keep every credential
+        safe in the IDE's own encrypted vault. Free and open source.</p>
+
+        <h3>Why you'll like it</h3>
         <ul>
-            <li><b>Session tree</b> — organize SSH sessions into folders in the <em>SSH Sessions</em> tool window.</li>
-            <li><b>Embedded terminals</b> — double-click a session to open an interactive SSH shell as a tab
-                in the <em>SSH Terminals</em> tool window.</li>
-            <li><b>Secure credentials</b> — passwords and key passphrases are stored in the IDE Password Safe,
-                never in plain-text config.</li>
-            <li><b>Key &amp; jump-host auth</b> — private-key authentication plus chained ProxyJump/bastion hosts.</li>
+            <li>🗂️ <b>Organized session tree</b> — group all your servers into folders in the
+                <em>SSH Sessions</em> tool window. Color-code and icon-tag sessions and folders,
+                rename in place with <b>Shift+F6</b>, and type-to-search to jump to any host instantly.</li>
+            <li>💻 <b>Real embedded terminals</b> — double-click a session to open a genuine interactive
+                SSH shell as a tab. Open terminals in the tool window <em>or</em> as full editor tabs,
+                with configurable scrollback for long-running output like <code>tail -f</code>.</li>
+            <li>🎨 <b>Terminals that match your theme</b> — ready-made color schemes (Classic Dark,
+                Solarized, Monokai, One Dark, Light), a "Follow IDE Theme" mode, and a fully editable
+                custom scheme (background, foreground, cursor, selection, all 16 ANSI colors).</li>
+            <li>🔐 <b>Credentials done right</b> — passwords and key passphrases live in the IDE
+                Password Safe, never in plain-text config. Private-key authentication and chained
+                <b>ProxyJump / bastion (jump-host)</b> connections are built in.</li>
+            <li>🛡️ <b>Security first</b> — SSH host keys are verified (trust-on-first-use, and it reads
+                your existing <code>~/.ssh/known_hosts</code>). Credential exports are AES-256 encrypted.
+                Weak legacy SHA-1/DSA algorithms are strictly opt-in, per session.</li>
+            <li>⚡ <b>Built for real work</b> — multi-select bulk edits (recolor, re-icon, or delete many
+                sessions at once), duplicate a session with one click to spin up a near-identical host,
+                and build out your tree with right-click <em>New Session Here</em> / <em>New Subfolder</em>.</li>
+            <li>🔁 <b>Import &amp; export</b> — move your sessions between machines, optionally including
+                encrypted credentials.</li>
         </ul>
+
+        <p>Works in IntelliJ IDEA and other JetBrains IDEs (2024.2+). No account, no telemetry —
+        your sessions and secrets stay on your machine.</p>
+
+        <p><b>Free &amp; open source (MIT).</b> If HaifaSSH saves you time, you can support its
+        development via the donation link on the plugin's homepage — entirely optional, always free.</p>
+
+        <p style="font-size:0.9em;color:#888;">HaifaSSH is an independent community plugin and is not
+        affiliated with or endorsed by JetBrains. All product names and trademarks are the property of
+        their respective owners.</p>
     ]]></description>
 
     <change-notes><![CDATA[
