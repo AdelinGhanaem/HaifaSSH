@@ -4,6 +4,7 @@ A fast, tabbed SSH session manager embedded in IntelliJ-based IDEs: organize SSH
 sessions in a folder tree, connect to an interactive terminal in one click, and
 keep credentials in the IDE Password Safe. Free and open source (MIT).
 
+[![Build](https://github.com/AdelinGhanaem/HaifaSSH/actions/workflows/build.yml/badge.svg)](https://github.com/AdelinGhanaem/HaifaSSH/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Support on Ko-fi](https://img.shields.io/badge/Support-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/adelinghanayem)
 
