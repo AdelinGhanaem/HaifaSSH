@@ -12,7 +12,7 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
 > system, how this plugin is implemented, a file-by-file code guide, and a full
 > security report.
 
-## Features (v0.11.1)
+## Features (v0.11.2)
 
 - **Session tree** — folders + sessions in the left-hand *SSH Sessions* tool window.
 - **Customizable appearance** — give each session a built-in **icon** (server, database,
@@ -73,7 +73,7 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
 After `buildPlugin`, install this file:
 
 ```
-build/distributions/haifassh-0.11.1.zip
+build/distributions/haifassh-0.11.2.zip
 ```
 
 In the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…**, then select

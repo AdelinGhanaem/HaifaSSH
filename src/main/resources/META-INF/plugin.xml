@@ -50,6 +50,9 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.11.2 — <b>Compatibility fix</b>: colored session/folder icons no longer crash the
+                <em>SSH Sessions</em> tree on IntelliJ 2025.2 and newer (a platform API changed how the
+                icon-tinting helper is called). No behavior change on older IDEs.</li>
             <li>0.10.0 — <b>Folder right-click actions</b>: right-click a folder for
                 <em>New Session Here</em> and <em>New Subfolder</em> — both create the new item
                 directly inside the folder you clicked, so you can build out a session tree

@@ -801,14 +801,17 @@ class SshSessionsPanel(
             when (obj) {
                 is SshFolder -> {
                     val color = AppearanceColors.parse(obj.color)
-                    icon = if (color != null) IconUtil.colorize(AllIcons.Nodes.Folder, color) else AllIcons.Nodes.Folder
+                    // Pass keepGray explicitly: calling the defaulted Kotlin overload emits a
+                    // synthetic colorize$default(...) call whose signature changed in 2025.2+/2026.x,
+                    // causing NoSuchMethodError. The explicit 3-arg call binds to the stable method.
+                    icon = if (color != null) IconUtil.colorize(AllIcons.Nodes.Folder, color, false) else AllIcons.Nodes.Folder
                     append(obj.name, nameAttributes(color, selected))
                 }
 
                 is SshSession -> {
                     val color = AppearanceColors.parse(obj.color)
                     val tint = color ?: AppearanceColors.DEFAULT_SESSION_TINT
-                    icon = IconUtil.colorize(SessionIcons.icon(obj.iconKey), tint)
+                    icon = IconUtil.colorize(SessionIcons.icon(obj.iconKey), tint, false)
                     append(obj.displayName(), nameAttributes(color, selected))
                     val target = buildString {
                         append("  ")
