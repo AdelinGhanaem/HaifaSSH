@@ -13,5 +13,8 @@ Start here. Read in order for a full picture, or jump to what you need.
 4. **[Security Report](04-security-report.md)** — threat model, findings (with
    severities and locations), a prioritized remediation roadmap, and the verdict
    on whether the plugin can be secured.
+5. **[Publishing to the JetBrains Marketplace](05-publishing-to-marketplace.md)** —
+   step-by-step release guide: build the zip, upload, moderation, listing media,
+   and the Gradle fast-path for future updates.
 
 For build/install/usage instructions, see the top-level [README](../README.md).
