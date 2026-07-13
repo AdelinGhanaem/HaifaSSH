@@ -6,6 +6,7 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.util.ui.FormBuilder
 import javax.swing.JComponent
+import javax.swing.JList
 
 /**
  * A small dialog for choosing one [SessionIcons] icon — used to set the icon of
@@ -15,9 +16,17 @@ class IconPickerDialog(project: Project, initialKey: String) : DialogWrapper(pro
 
     private val combo = ComboBox(SessionIcons.choices.toTypedArray()).apply {
         selectedItem = SessionIcons.choice(initialKey)
-        renderer = SimpleListCellRenderer.create<SessionIcons.Choice> { label, value, _ ->
-            label.text = value?.label ?: ""
-            label.icon = value?.icon
+        renderer = object : SimpleListCellRenderer<SessionIcons.Choice>() {
+            override fun customize(
+                list: JList<out SessionIcons.Choice>,
+                value: SessionIcons.Choice?,
+                index: Int,
+                selected: Boolean,
+                hasFocus: Boolean,
+            ) {
+                text = value?.label ?: ""
+                icon = value?.icon
+            }
         }
     }
 

@@ -14,6 +14,7 @@ import com.intellij.util.ui.FormBuilder
 import com.haifasoft.haifassh.model.JumpHost
 import com.haifasoft.haifassh.model.SshAuthType
 import javax.swing.JComponent
+import javax.swing.JList
 
 /** A jump host together with its (in-memory) secrets while being edited. */
 class JumpHostEntry(
@@ -36,7 +37,17 @@ class JumpHostDialog(
     private val usernameField = JBTextField(entry.host.username)
     private val authCombo = ComboBox(arrayOf(SshAuthType.PASSWORD, SshAuthType.KEY)).apply {
         selectedItem = entry.host.authType
-        renderer = SimpleListCellRenderer.create("") { authLabel(it) }
+        renderer = object : SimpleListCellRenderer<SshAuthType>() {
+            override fun customize(
+                list: JList<out SshAuthType>,
+                value: SshAuthType?,
+                index: Int,
+                selected: Boolean,
+                hasFocus: Boolean,
+            ) {
+                text = value?.let { authLabel(it) } ?: ""
+            }
+        }
     }
     private val keyPathField = TextFieldWithBrowseButton().apply { text = entry.host.privateKeyPath }
     private val passwordField = JBPasswordField().apply { text = entry.password ?: "" }
@@ -44,6 +55,11 @@ class JumpHostDialog(
 
     init {
         title = if (isNew) "Add Jump Host" else "Edit Jump Host"
+        // NB: the non-deprecated addBrowseFolderListener(project, descriptor) overload only
+        // exists in 2024.3+. Since we support 2024.2 (since-build 242), we keep this deprecated
+        // 4-arg form — it is merely scheduled-for-removal (a warning) and works on every
+        // supported IDE. Revisit if the minimum supported build is ever raised.
+        @Suppress("DEPRECATION")
         keyPathField.addBrowseFolderListener(
             "Select Private Key",
             "Choose the private key file for this jump host",

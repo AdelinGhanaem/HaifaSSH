@@ -10,6 +10,7 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import javax.swing.JComponent
+import javax.swing.JList
 
 /** Scope a saved command belongs to. */
 enum class SnippetScope { GLOBAL, SESSION }
@@ -42,7 +43,17 @@ class CommandSnippetDialog(
     }
     private val scopeCombo = ComboBox(arrayOf(SnippetScope.GLOBAL, SnippetScope.SESSION)).apply {
         selectedItem = edit.scope
-        renderer = SimpleListCellRenderer.create("") { scopeLabel(it, sessionName) }
+        renderer = object : SimpleListCellRenderer<SnippetScope>() {
+            override fun customize(
+                list: JList<out SnippetScope>,
+                value: SnippetScope?,
+                index: Int,
+                selected: Boolean,
+                hasFocus: Boolean,
+            ) {
+                text = value?.let { scopeLabel(it, sessionName) } ?: ""
+            }
+        }
     }
 
     init {

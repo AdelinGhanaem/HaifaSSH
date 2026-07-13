@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.CustomShortcutSet
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.service
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.fileChooser.FileChooserFactory
@@ -16,7 +17,7 @@ import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import com.intellij.ui.ColorChooser
+import com.intellij.ui.ColorChooserService
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.PopupHandler
@@ -453,7 +454,7 @@ class SshSessionsPanel(
 
         val current = sessions.firstOrNull()?.color ?: folders.firstOrNull()?.color ?: ""
         val initial = AppearanceColors.parse(current) ?: AppearanceColors.DEFAULT_SESSION_TINT
-        val chosen = ColorChooser.chooseColor(this, "Choose Color", initial) ?: return
+        val chosen = service<ColorChooserService>().showDialog(this, "Choose Color", initial) ?: return
         val hex = AppearanceColors.toHex(chosen)
 
         if (sessions.isNotEmpty()) {
