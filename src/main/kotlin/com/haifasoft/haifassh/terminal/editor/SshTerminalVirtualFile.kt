@@ -24,6 +24,10 @@ import com.haifasoft.haifassh.terminal.assist.SshTerminalPane
  * (widget buffer, SSH connection) would be destroyed mid-move. The pane is
  * created once on first request and torn down only via [tearDown] when the file
  * is closed everywhere.
+ *
+ * Because that one pane is a single Swing component, it can live in only one
+ * editor split at a time; this file also arbitrates which [SshTerminalEditorView]
+ * currently displays it.
  */
 class SshTerminalVirtualFile(
     val session: SshSession,
@@ -47,6 +51,38 @@ class SshTerminalVirtualFile(
         pane = created
         lifetime = life
         return created
+    }
+
+    // ---- Which split shows the terminal ------------------------------------
+
+    private val views = mutableListOf<SshTerminalEditorView>()
+    private var showingIn: SshTerminalEditorView? = null
+
+    /** Registers a newly opened editor's view. The first one to arrive gets the terminal. */
+    fun addView(view: SshTerminalEditorView) {
+        if (!views.contains(view)) views.add(view)
+        if (showingIn == null) showTerminalIn(view)
+    }
+
+    /** Unregisters a closing editor's view, handing the terminal to a split that is left. */
+    fun removeView(view: SshTerminalEditorView) {
+        views.remove(view)
+        if (showingIn === view) {
+            showingIn = null
+            views.lastOrNull()?.let { showTerminalIn(it) }
+        }
+    }
+
+    /**
+     * Moves the live terminal into [view]. Whichever split had it falls back to its
+     * placeholder first, so the component is only ever inside one container.
+     */
+    fun showTerminalIn(view: SshTerminalEditorView) {
+        if (tornDown || view !in views) return
+        if (showingIn === view && view.holdsTerminal) return
+        showingIn?.takeIf { it !== view }?.showPlaceholder()
+        showingIn = view
+        view.showTerminal()
     }
 
     /** Closes the widget, its listeners, and the SSH connection. Idempotent. */

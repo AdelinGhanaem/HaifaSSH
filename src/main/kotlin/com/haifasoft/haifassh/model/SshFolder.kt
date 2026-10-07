@@ -11,4 +11,11 @@ class SshFolder {
 
     /** `#RRGGBB` tint applied to the folder icon and name in the tree (blank = default). */
     var color: String = ""
+
+    /**
+     * Manual ordering among the sub-folders of [parentId], lowest first. Ties
+     * (and the `0` every pre-ordering folder loads with) fall back to name order,
+     * so a tree that was never reordered stays alphabetical.
+     */
+    var position: Int = 0
 }

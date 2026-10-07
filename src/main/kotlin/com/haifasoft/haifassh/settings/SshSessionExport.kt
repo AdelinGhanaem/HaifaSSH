@@ -40,6 +40,9 @@ class SshSessionExport {
     var iconKey: String = ""
     var color: String = ""
 
+    /** Manual order within [folderId]; absent in pre-0.12 exports, which import as 0. */
+    var position: Int = 0
+
     @get:XCollection(style = XCollection.Style.v2)
     var jumpHosts: MutableList<JumpHostExport> = mutableListOf()
 

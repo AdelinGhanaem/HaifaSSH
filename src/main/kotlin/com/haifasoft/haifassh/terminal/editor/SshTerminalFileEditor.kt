@@ -22,6 +22,10 @@ import javax.swing.JComponent
  * to another split or window, and owning the widget here would wipe the terminal
  * text and kill the SSH connection on every re-arrange. This editor only
  * presents the file's pane; teardown happens when the file is closed everywhere.
+ *
+ * What it hands the platform is its own [SshTerminalEditorView], never the pane
+ * component directly: splitting the editor creates a second editor for the same
+ * file, and two editors returning one component would leave the loser blank.
  */
 class SshTerminalFileEditor(
     private val project: Project,
@@ -29,11 +33,16 @@ class SshTerminalFileEditor(
 ) : UserDataHolderBase(), FileEditor {
 
     private val pane: SshTerminalPane = file.acquirePane(project)
+    private val view = SshTerminalEditorView(file, pane.component)
     private val changeSupport = PropertyChangeSupport(this)
 
-    override fun getComponent(): JComponent = pane.component
+    init {
+        file.addView(view)
+    }
 
-    override fun getPreferredFocusedComponent(): JComponent = pane.preferredFocus
+    override fun getComponent(): JComponent = view
+
+    override fun getPreferredFocusedComponent(): JComponent = view.preferredFocus
 
     override fun getName(): String = file.session.displayName()
 
@@ -57,6 +66,9 @@ class SshTerminalFileEditor(
         changeSupport.removePropertyChangeListener(listener)
 
     override fun dispose() {
+        // Give the terminal back to a split that is still open (closing one half of a
+        // split, or dragging the tab, disposes this editor while the terminal lives on).
+        file.removeView(view)
         // Disposal happens both on real close AND mid-drag (move to another split
         // recreates the editor for the same file). Defer, then only tear the
         // terminal down if the file is no longer open anywhere in the project.

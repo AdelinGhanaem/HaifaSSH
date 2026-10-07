@@ -72,6 +72,16 @@ class SshTerminalPane(
 
         splitter.orientation = position == "top" || position == "bottom" // true = stacked vertically
         val assistantFirst = position == "left" || position == "top"
+
+        // Splitter keeps one slot per component and drops whatever the slot it is
+        // assigned to held before. Moving the widget to the other side while the old
+        // slot still points at it therefore removes it from the splitter altogether —
+        // the terminal vanishes. Vacate the stale slot first, and only when the widget
+        // really is changing sides (assigning it to the slot it already occupies is a
+        // no-op, which is what keeps a plain show/hide from reparenting the canvas).
+        if (assistantFirst && splitter.firstComponent === widget) splitter.firstComponent = null
+        if (!assistantFirst && splitter.secondComponent === widget) splitter.secondComponent = null
+
         if (assistantFirst) {
             splitter.secondComponent = widget
             splitter.firstComponent = if (visible) assistant else null

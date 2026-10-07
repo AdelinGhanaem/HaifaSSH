@@ -37,16 +37,21 @@ import com.haifasoft.haifassh.settings.SshSessionTransfer
 import com.haifasoft.haifassh.terminal.SshTerminalManager
 import java.awt.BorderLayout
 import java.awt.Component
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
+import java.awt.datatransfer.UnsupportedFlavorException
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.util.EventObject
 import javax.swing.AbstractCellEditor
 import javax.swing.BorderFactory
+import javax.swing.DropMode
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JTree
 import javax.swing.KeyStroke
 import javax.swing.SwingUtilities
+import javax.swing.TransferHandler
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreeCellEditor
@@ -101,6 +106,13 @@ class SshSessionsPanel(
         keepSelectionHomogeneous()
         tree.cellRenderer = SessionTreeCellRenderer()
         tree.emptyText.text = "No SSH sessions yet — click + to add one"
+
+        // Drag & drop: move sessions/folders between folders, and reorder them.
+        // ON_OR_INSERT gives both gestures — drop *on* a folder to move into it,
+        // drop *between* two rows to place the drag at that spot.
+        tree.dragEnabled = true
+        tree.dropMode = DropMode.ON_OR_INSERT
+        tree.transferHandler = SessionTreeTransferHandler()
 
         // In-place rename (Shift+F6). The editor only starts programmatically,
         // so ordinary clicks never put a node into edit mode.
@@ -525,6 +537,124 @@ class SshSessionsPanel(
         PopupHandler.installPopupMenu(tree, group, "HaifaSshSessionsTreePopup")
     }
 
+    // ---- Drag & drop -------------------------------------------------------
+
+    /** Payload of a drag: the ids of the dragged sessions, or of the dragged folders. */
+    private class TreeTransfer(val sessionIds: List<String>, val folderIds: List<String>)
+
+    /** Where a drop would land: a parent folder and an index within that parent. */
+    private class DropTarget(val parentId: String, val index: Int)
+
+    /**
+     * Moves sessions and folders around the tree. A drag carries whichever kind is
+     * selected (the selection is already homogeneous — see [keepSelectionHomogeneous]);
+     * dropping on a folder moves into it, dropping between rows also sets the order.
+     */
+    private inner class SessionTreeTransferHandler : TransferHandler() {
+
+        override fun getSourceActions(c: JComponent): Int = MOVE
+
+        override fun createTransferable(c: JComponent): Transferable? {
+            // Sort by row so a multi-item drag keeps the order it had in the tree.
+            val objects = (tree.selectionPaths ?: emptyArray())
+                .sortedBy { tree.getRowForPath(it) }
+                .mapNotNull { (it.lastPathComponent as? DefaultMutableTreeNode)?.userObject }
+            val payload = TreeTransfer(
+                sessionIds = objects.filterIsInstance<SshSession>().map { it.id },
+                folderIds = objects.filterIsInstance<SshFolder>().map { it.id },
+            )
+            if (payload.sessionIds.isEmpty() && payload.folderIds.isEmpty()) return null
+            return object : Transferable {
+                override fun getTransferDataFlavors(): Array<DataFlavor> = arrayOf(NODES_FLAVOR)
+
+                override fun isDataFlavorSupported(flavor: DataFlavor): Boolean = flavor == NODES_FLAVOR
+
+                override fun getTransferData(flavor: DataFlavor): Any =
+                    if (flavor == NODES_FLAVOR) payload else throw UnsupportedFlavorException(flavor)
+            }
+        }
+
+        override fun canImport(support: TransferSupport): Boolean {
+            if (!support.isDrop || !support.isDataFlavorSupported(NODES_FLAVOR)) return false
+            val payload = payload(support) ?: return false
+            return dropTarget(support, payload) != null
+        }
+
+        override fun importData(support: TransferSupport): Boolean {
+            if (!support.isDrop || !support.isDataFlavorSupported(NODES_FLAVOR)) return false
+            val payload = payload(support) ?: return false
+            val target = dropTarget(support, payload) ?: return false
+            // Defer so the tree isn't rebuilt while Swing is still finishing the drop.
+            SwingUtilities.invokeLater {
+                if (payload.folderIds.isNotEmpty()) {
+                    service.moveFolders(payload.folderIds, target.parentId, target.index)
+                    reselect(folderIds = payload.folderIds)
+                } else {
+                    service.moveSessions(payload.sessionIds, target.parentId, target.index)
+                    reselect(sessionIds = payload.sessionIds)
+                }
+            }
+            return true
+        }
+
+        private fun payload(support: TransferSupport): TreeTransfer? =
+            runCatching { support.transferable.getTransferData(NODES_FLAVOR) as TreeTransfer }.getOrNull()
+
+        /**
+         * Resolves the drop location to a parent folder plus an insert index, or null
+         * when the drop must be refused (a folder can't be moved inside itself).
+         */
+        private fun dropTarget(support: TransferSupport, payload: TreeTransfer): DropTarget? {
+            val location = support.dropLocation as? JTree.DropLocation ?: return null
+            // A null path means the empty space below the last row: move to the tree root.
+            val node = location.path?.lastPathComponent as? DefaultMutableTreeNode
+                ?: return validated("", -1, payload)
+
+            if (location.childIndex < 0) {
+                // Dropped *on* a row: a folder takes the drag, a session hands it to its folder.
+                return when (val obj = node.userObject) {
+                    is SshFolder -> validated(obj.id, -1, payload)
+                    is SshSession ->
+                        if (obj.id in payload.sessionIds) null else validated(obj.folderId, -1, payload)
+                    else -> validated("", -1, payload)
+                }
+            }
+
+            // Dropped *between* two children: the tree lists a folder's sub-folders
+            // before its sessions, so translate the child index into an index within
+            // the dragged kind's own list, then discount the items being moved (they
+            // are still in the list when the drag reorders inside its own parent).
+            val parentId = (node.userObject as? SshFolder)?.id ?: ""
+            val folderCount = service.foldersIn(parentId).size
+            val raw = if (payload.folderIds.isNotEmpty()) {
+                location.childIndex.coerceAtMost(folderCount)
+            } else {
+                (location.childIndex - folderCount).coerceAtLeast(0)
+            }
+            return validated(parentId, discountMoved(parentId, raw, payload), payload)
+        }
+
+        /** Rejects a move that would put a folder inside its own subtree. */
+        private fun validated(parentId: String, index: Int, payload: TreeTransfer): DropTarget? {
+            if (payload.folderIds.any { service.isInSubtree(parentId, it) }) return null
+            return DropTarget(parentId, index)
+        }
+
+        /**
+         * Turns an index into the parent's current children into the index the service
+         * expects — one counted with the dragged items already taken out.
+         */
+        private fun discountMoved(parentId: String, index: Int, payload: TreeTransfer): Int {
+            val ids = if (payload.folderIds.isNotEmpty()) {
+                service.foldersIn(parentId).map { it.id }
+            } else {
+                service.sessionsIn(parentId).map { it.id }
+            }
+            val moving = (payload.folderIds + payload.sessionIds).toSet()
+            return index - ids.take(index).count { it in moving }
+        }
+    }
+
     // ---- Toolbar actions ---------------------------------------------------
 
     private inner class ConnectAction : DumbAwareAction(
@@ -835,5 +965,17 @@ class SshSessionsPanel(
             } else {
                 SimpleTextAttributes.REGULAR_ATTRIBUTES
             }
+    }
+
+    private companion object {
+        /**
+         * Same-JVM object handoff: the drag never leaves this tree, so the payload
+         * travels by reference rather than being serialized.
+         */
+        val NODES_FLAVOR: DataFlavor = DataFlavor(
+            "${DataFlavor.javaJVMLocalObjectMimeType};class=${TreeTransfer::class.java.name}",
+            "HaifaSSH session tree nodes",
+            SshSessionsPanel::class.java.classLoader,
+        )
     }
 }

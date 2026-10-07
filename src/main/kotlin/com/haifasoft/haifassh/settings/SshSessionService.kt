@@ -33,11 +33,18 @@ class SshSessionService : PersistentStateComponent<SshSessionState> {
 
     fun sessions(): List<SshSession> = state.sessions.toList()
 
+    /**
+     * Sub-folders of [parentId] in display order: manual [SshFolder.position]
+     * first, name as the tie-breaker so a never-reordered tree stays alphabetical.
+     */
     fun foldersIn(parentId: String): List<SshFolder> =
-        state.folders.filter { it.parentId == parentId }.sortedBy { it.name.lowercase() }
+        state.folders.filter { it.parentId == parentId }
+            .sortedWith(compareBy({ it.position }, { it.name.lowercase() }))
 
+    /** Sessions of [folderId] in display order — see [foldersIn] for the ordering rule. */
     fun sessionsIn(folderId: String): List<SshSession> =
-        state.sessions.filter { it.folderId == folderId }.sortedBy { it.displayName().lowercase() }
+        state.sessions.filter { it.folderId == folderId }
+            .sortedWith(compareBy({ it.position }, { it.displayName().lowercase() }))
 
     fun findSession(id: String): SshSession? = state.sessions.firstOrNull { it.id == id }
 
@@ -164,6 +171,66 @@ class SshSessionService : PersistentStateComponent<SshSessionState> {
         val removedSessions = state.sessions.filter { it.folderId in toRemove }
         removedSessions.forEach { SshCredentialStore.clearSession(it.id) }
         state.sessions.removeIf { it.folderId in toRemove }
+        fireChanged()
+    }
+
+    // ---- Reordering & moving (drag & drop) ---------------------------------
+
+    /**
+     * True when [folderId] is [ancestorId] itself or lives anywhere beneath it.
+     * Used to reject a drag that would make a folder its own parent.
+     */
+    fun isInSubtree(folderId: String, ancestorId: String): Boolean {
+        if (ancestorId.isBlank()) return false
+        var current: String? = folderId
+        val seen = hashSetOf<String>()
+        while (!current.isNullOrBlank() && seen.add(current)) {
+            if (current == ancestorId) return true
+            current = findFolder(current)?.parentId
+        }
+        return false
+    }
+
+    /**
+     * Moves [ids] into [targetFolderId] (blank = tree root) and places them at
+     * [index] among that folder's sessions. [index] counts the target folder's
+     * sessions *excluding* the ones being moved; pass a negative value to append.
+     * The moved sessions keep their relative order.
+     */
+    fun moveSessions(ids: List<String>, targetFolderId: String, index: Int) {
+        if (targetFolderId.isNotBlank() && findFolder(targetFolderId) == null) return
+        val moving = ids.mapNotNull { findSession(it) }
+        if (moving.isEmpty()) return
+
+        val sourceFolders = moving.map { it.folderId }.toSet() - targetFolderId
+        val siblings = sessionsIn(targetFolderId).filterNot { moved -> moving.any { it === moved } }
+        val at = if (index < 0) siblings.size else index.coerceIn(0, siblings.size)
+
+        moving.forEach { it.folderId = targetFolderId }
+        siblings.toMutableList().apply { addAll(at, moving) }.forEachIndexed { i, s -> s.position = i }
+        // Close the gaps left behind so the folders they came from stay tidy.
+        sourceFolders.forEach { source -> sessionsIn(source).forEachIndexed { i, s -> s.position = i } }
+        fireChanged()
+    }
+
+    /**
+     * Moves folders [ids] under [targetParentId] (blank = tree root) at [index]
+     * among that parent's sub-folders, with the same index convention as
+     * [moveSessions]. A folder that would end up inside its own subtree is skipped.
+     */
+    fun moveFolders(ids: List<String>, targetParentId: String, index: Int) {
+        if (targetParentId.isNotBlank() && findFolder(targetParentId) == null) return
+        val moving = ids.mapNotNull { findFolder(it) }
+            .filterNot { isInSubtree(targetParentId, it.id) }
+        if (moving.isEmpty()) return
+
+        val sourceParents = moving.map { it.parentId }.toSet() - targetParentId
+        val siblings = foldersIn(targetParentId).filterNot { moved -> moving.any { it === moved } }
+        val at = if (index < 0) siblings.size else index.coerceIn(0, siblings.size)
+
+        moving.forEach { it.parentId = targetParentId }
+        siblings.toMutableList().apply { addAll(at, moving) }.forEachIndexed { i, f -> f.position = i }
+        sourceParents.forEach { source -> foldersIn(source).forEachIndexed { i, f -> f.position = i } }
         fireChanged()
     }
 

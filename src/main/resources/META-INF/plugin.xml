@@ -50,6 +50,16 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.12.0 — <b>Drag &amp; drop</b>: drag sessions and folders between folders to
+                reorganize the tree, and drop them <em>between</em> two rows to arrange the
+                list in exactly the order you want. The manual order is saved with the
+                session tree (and travels with export/import); folders you never reorder
+                stay sorted by name.</li>
+            <li>0.12.0 — <b>Split-editor fix</b>: splitting the editor with a terminal tab open
+                no longer leaves one split blank and unresizable. A live terminal is a single
+                widget, so it can only be inside one split at a time; the other split now shows
+                a short notice with a <em>Show it here</em> link to move it over, and both sides
+                lay out and resize normally.</li>
             <li>0.11.2 — <b>Compatibility fix</b>: colored session/folder icons no longer crash the
                 <em>SSH Sessions</em> tree on IntelliJ 2025.2 and newer (a platform API changed how the
                 icon-tinting helper is called). No behavior change on older IDEs.</li>

@@ -12,7 +12,7 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
 > system, how this plugin is implemented, a file-by-file code guide, and a full
 > security report.
 
-## Features (v0.11.2)
+## Features (v0.12.0)
 
 - **Session tree** — folders + sessions in the left-hand *SSH Sessions* tool window.
 - **Customizable appearance** — give each session a built-in **icon** (server, database,
@@ -27,6 +27,9 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
   password/passphrase), so you can tweak one detail and save it as a new connection.
 - **Build the tree from a folder** — right-click a folder for *New Session Here* and
   *New Subfolder*; both create the new item directly inside that folder.
+- **Drag & drop** — drag sessions and folders into (or out of) any folder to reorganize
+  the tree; drop *between* two rows instead of *on* one to set the order yourself. The
+  manual order sticks, and lists you never rearrange stay alphabetical.
 - **In-place rename** — press **Shift+F6** on any folder or session to rename it right in
   the tree, just like renaming a symbol; **Esc** cancels.
 - **Quick search** — start typing in the tree to find and jump to a session/folder by name.
@@ -36,6 +39,8 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
 - **Terminal opens as an editor tab** — by default the shell opens in the editor area,
   right where source files open. Toggle the *Open Terminals in Editor Tab* button in the
   *SSH Sessions* toolbar to fall back to the bottom *SSH Terminals* tool window instead.
+  Splitting the editor works normally: a terminal can only run in one split at a time, so
+  the other split offers a *Show it here* link to move it over.
 - **Terminal color schemes** — pick a ready-made template (Classic Dark, Solarized Dark/Light,
   Monokai, One Dark, Light), **Follow IDE Theme**, or a fully editable **Custom** scheme
   (background, foreground, selection, cursor, and all 16 ANSI colors) under

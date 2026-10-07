@@ -42,6 +42,13 @@ class SshSession {
     var iconKey: String = ""
     var color: String = ""
 
+    /**
+     * Manual ordering among the sessions of [folderId], lowest first. Ties (and
+     * the `0` every pre-ordering session loads with) fall back to name order, so
+     * a tree that was never reordered stays alphabetical.
+     */
+    var position: Int = 0
+
     @get:XCollection(style = XCollection.Style.v2)
     var jumpHosts: MutableList<JumpHost> = mutableListOf()
 
@@ -61,6 +68,7 @@ class SshSession {
         c.allowLegacyAlgorithms = allowLegacyAlgorithms
         c.iconKey = iconKey
         c.color = color
+        c.position = position
         c.jumpHosts = jumpHosts.map { it.copyOf() }.toMutableList()
         return c
     }
