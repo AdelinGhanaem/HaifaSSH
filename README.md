@@ -12,7 +12,7 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
 > system, how this plugin is implemented, a file-by-file code guide, and a full
 > security report.
 
-## Features (v0.13.0)
+## Features (v0.15.0)
 
 - **Session tree** — folders + sessions in the left-hand *SSH Sessions* tool window.
 - **Customizable appearance** — give each session a built-in **icon** (server, database,
@@ -41,6 +41,18 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
   an SSH shell. An "Open SSH Terminal" button is readily available in the file browser whenever SSH is supported.
 - **Embedded SFTP / FTP file browser** — navigate remote directories, create folders, rename,
   delete, and download files directly into the IDE.
+- **Side-by-side local filesystem explorer** — open your local file explorer side-by-side with
+  active SFTP/FTP sessions in a resizable split view. Explore local folders and drives, select
+  multiple files, and drag-and-drop them directly into remote directories to upload.
+- **IntelliJ Terminal-style View Modes & Docking** — customize how the local explorer is displayed:
+  *Docked Pinned* (side-by-side split), *Docked Unpinned*, or detach into a floating
+  *Window / Float / Undock* mode. Move the docked panel *Left*, *Right*, *Up*, or *Down* anytime,
+  or click *Put back to dock* to return to the session view.
+- **File Explorer Type-to-Jump / SpeedSearch** — in both local and remote file browsers, start
+  typing a name (e.g. `Down`) to jump selection directly to that file (e.g. `Downloads`) and scroll
+  it into view. Repeatedly pressing the same key cycles through matching items.
+- **Overhauled toolbar layout with hover feedback** — full-width address bar placed above the
+  icons, with responsive rounded hover highlights, hand cursor, and instant tooltips on every button.
 - **Drag & drop upload** — drag files directly from your desktop or the IntelliJ Project View and drop
   them into the remote file browser to upload with background progress and cancellation.
 - **Split-pane file browser alongside terminal** — by default, live SSH terminals open with the
@@ -88,7 +100,7 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
 After `buildPlugin`, install this file:
 
 ```
-build/distributions/haifassh-0.11.2.zip
+build/distributions/haifassh-0.15.0.zip
 ```
 
 In the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…**, then select
