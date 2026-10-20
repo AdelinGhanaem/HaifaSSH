@@ -1,5 +1,6 @@
 package com.haifasoft.haifassh.ssh
 
+import com.jcraft.jsch.ChannelSftp
 import com.jcraft.jsch.ChannelShell
 import com.jcraft.jsch.Session
 import java.io.InputStream
@@ -13,7 +14,7 @@ class SshShellHandle(
     private val channel: ChannelShell,
     val inputStream: InputStream,
     val outputStream: OutputStream,
-    private val sessions: List<Session>,
+    val sessions: List<Session>,
 ) {
     val isConnected: Boolean
         get() = channel.isConnected
@@ -25,6 +26,17 @@ class SshShellHandle(
     }
 
     fun exitStatus(): Int = channel.exitStatus
+
+    /**
+     * Opens an SFTP channel on the target host reusing the existing authenticated SSH session.
+     */
+    fun openSftpChannel(): ChannelSftp {
+        require(sessions.isNotEmpty()) { "No active SSH session available" }
+        val target = sessions.last()
+        val sftp = target.openChannel("sftp") as ChannelSftp
+        sftp.connect(30_000)
+        return sftp
+    }
 
     fun close() {
         runCatching { channel.disconnect() }

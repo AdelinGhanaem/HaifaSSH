@@ -1,7 +1,7 @@
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
-    id("org.jetbrains.intellij.platform") version "2.1.0"
+    id("org.jetbrains.intellij.platform") version "2.2.1"
 }
 
 group = providers.gradleProperty("pluginGroup").get()
@@ -34,6 +34,11 @@ dependencies {
     implementation("org.jetbrains.jediterm:jediterm-ui:3.53") {
         exclude(group = "org.jetbrains.kotlin")
     }
+    
+    // FTP Client
+    implementation("commons-net:commons-net:3.11.1")
+
+    testImplementation("junit:junit:4.13.2")
 }
 
 intellijPlatform {

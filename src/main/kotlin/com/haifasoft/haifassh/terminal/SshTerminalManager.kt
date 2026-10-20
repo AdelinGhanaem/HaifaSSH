@@ -18,6 +18,7 @@ import com.haifasoft.haifassh.model.SshSession
 import com.haifasoft.haifassh.settings.HaifaSshSettings
 import com.haifasoft.haifassh.settings.SshCredentialStore
 import com.haifasoft.haifassh.ssh.HopConfig
+import com.haifasoft.haifassh.ssh.SshConnectionHelper
 import com.haifasoft.haifassh.ssh.SshConnector
 import com.haifasoft.haifassh.ssh.SshShellHandle
 import com.haifasoft.haifassh.terminal.editor.SshTerminalVirtualFile
@@ -36,14 +37,14 @@ class SshTerminalManager(private val project: Project) {
         }
 
         // Resolve secrets (may prompt) on the EDT before going to a background thread.
-        val chain = buildChain(session) ?: return
+        val chain = SshConnectionHelper.buildChain(project, session) ?: return
 
         object : Task.Backgroundable(project, "Connecting to ${session.displayName()}", true) {
             private var handle: SshShellHandle? = null
 
             override fun run(indicator: ProgressIndicator) {
                 indicator.isIndeterminate = true
-                handle = SshConnector.openShell(chain, "xterm-256color", 80, 24, hostKeyPrompt())
+                handle = SshConnector.openShell(chain, "xterm-256color", 80, 24, SshConnectionHelper.hostKeyPrompt(project))
             }
 
             override fun onSuccess() {
@@ -97,101 +98,6 @@ class SshTerminalManager(private val project: Project) {
         toolWindow.contentManager.addContent(content)
         toolWindow.contentManager.setSelectedContent(content)
         toolWindow.activate { pane.preferredFocus.requestFocusInWindow() }
-    }
-
-    private fun buildChain(session: SshSession): List<HopConfig>? {
-        val chain = ArrayList<HopConfig>(session.jumpHosts.size + 1)
-        session.jumpHosts.forEachIndexed { index, jump ->
-            val hop = resolveHop(
-                label = "jump host ${jump.label()}",
-                host = jump.host,
-                port = jump.port,
-                username = jump.username,
-                authType = jump.authType,
-                keyPath = jump.privateKeyPath,
-                password = SshCredentialStore.getJumpPassword(session.id, index),
-                passphrase = SshCredentialStore.getJumpPassphrase(session.id, index),
-                allowLegacy = session.allowLegacyAlgorithms,
-            ) ?: return null
-            chain.add(hop)
-        }
-
-        val target = resolveHop(
-            label = session.displayName(),
-            host = session.host,
-            port = session.port,
-            username = session.username,
-            authType = session.authType,
-            keyPath = session.privateKeyPath,
-            password = SshCredentialStore.getPassword(session.id),
-            passphrase = SshCredentialStore.getPassphrase(session.id),
-            allowLegacy = session.allowLegacyAlgorithms,
-        ) ?: return null
-        chain.add(target)
-        return chain
-    }
-
-    private fun resolveHop(
-        label: String,
-        host: String,
-        port: Int,
-        username: String,
-        authType: SshAuthType,
-        keyPath: String,
-        password: String?,
-        passphrase: String?,
-        allowLegacy: Boolean,
-    ): HopConfig? {
-        var resolvedPassword = password
-        if (authType == SshAuthType.PASSWORD && resolvedPassword.isNullOrEmpty()) {
-            resolvedPassword = Messages.showPasswordDialog(
-                project,
-                "Password for $label:",
-                "SSH Authentication",
-                null,
-            ) ?: return null // user cancelled
-        }
-        // Hand the connector wipeable byte arrays. (The source Strings from
-        // PasswordSafe / the prompt are inherent to those platform APIs.)
-        return HopConfig(
-            host,
-            port,
-            username,
-            authType,
-            keyPath,
-            resolvedPassword?.toByteArray(Charsets.UTF_8),
-            passphrase?.toByteArray(Charsets.UTF_8),
-            allowLegacy,
-        )
-    }
-
-    /**
-     * Host-key prompt that runs on the EDT (the connection itself is on a
-     * background thread). Unknown keys ask for trust-on-first-use; a *changed*
-     * key shows JSch's MITM warning first, then asks — defaulting the focus to
-     * the safe "No" choice.
-     */
-    private fun hostKeyPrompt(): SshConnector.HostKeyPrompt = object : SshConnector.HostKeyPrompt {
-        override fun confirm(message: String): Boolean {
-            var trust = false
-            ApplicationManager.getApplication().invokeAndWait {
-                trust = Messages.showYesNoDialog(
-                    project,
-                    message,
-                    "SSH Host Key Verification",
-                    "Connect",
-                    "Abort",
-                    Messages.getWarningIcon(),
-                ) == Messages.YES
-            }
-            return trust
-        }
-
-        override fun notify(message: String) {
-            ApplicationManager.getApplication().invokeAndWait {
-                Messages.showWarningDialog(project, message, "SSH Host Key Warning")
-            }
-        }
     }
 
     private fun notifyError(message: String) {

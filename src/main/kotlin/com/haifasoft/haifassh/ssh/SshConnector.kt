@@ -1,12 +1,14 @@
 package com.haifasoft.haifassh.ssh
 
+import com.haifasoft.haifassh.fs.sftp.SftpFileSystem
+import com.haifasoft.haifassh.model.SshAuthType
 import com.intellij.openapi.application.PathManager
+import com.jcraft.jsch.ChannelSftp
 import com.jcraft.jsch.ChannelShell
 import com.jcraft.jsch.HostKeyRepository
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
 import com.jcraft.jsch.UserInfo
-import com.haifasoft.haifassh.model.SshAuthType
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -50,39 +52,8 @@ object SshConnector {
         rows: Int,
         hostKeyPrompt: HostKeyPrompt,
     ): SshShellHandle {
-        require(chain.isNotEmpty()) { "Connection chain must contain at least the target host" }
-
-        val jsch = JSch()
-        jsch.hostKeyRepository = buildHostKeyRepository()
-        val userInfo = HostKeyUserInfo(hostKeyPrompt)
-        val opened = ArrayList<Session>(chain.size)
+        val opened = connectSessions(chain, hostKeyPrompt)
         try {
-            var previous: Session? = null
-            for (hop in chain) {
-                // First hop is reached directly; later hops are reached through a local
-                // forward opened on the previous hop's session.
-                val (connectHost, connectPort) = if (previous == null) {
-                    hop.host to hop.port
-                } else {
-                    val localPort = previous.setPortForwardingL("127.0.0.1", 0, hop.host, hop.port)
-                    "127.0.0.1" to localPort
-                }
-
-                val session = jsch.getSession(hop.username, connectHost, connectPort)
-                applyAuth(jsch, session, hop)
-                // Verify against the hop's REAL identity, not the (possibly tunneled,
-                // ephemeral-port) socket we actually connect to. JSch uses the alias
-                // verbatim as the known_hosts key, so entries stay stable across jumps.
-                session.hostKeyAlias = knownHostsAlias(hop.host, hop.port)
-                session.userInfo = userInfo
-                session.setConfig("StrictHostKeyChecking", "ask")
-                if (hop.allowLegacy) enableLegacyAlgorithms(session)
-                session.serverAliveInterval = KEEPALIVE_INTERVAL_MS
-                session.connect(CONNECT_TIMEOUT_MS)
-                opened.add(session)
-                previous = session
-            }
-
             val target = opened.last()
             val channel = target.openChannel("shell") as ChannelShell
             channel.setPtyType(termType)
@@ -95,8 +66,64 @@ object SshConnector {
         } catch (t: Throwable) {
             opened.asReversed().forEach { runCatching { it.disconnect() } }
             throw t
+        }
+    }
+
+    /**
+     * Opens an SFTP channel on the target host through the jump host chain.
+     */
+    fun openSftp(
+        chain: List<HopConfig>,
+        hostKeyPrompt: HostKeyPrompt,
+    ): SftpFileSystem {
+        val opened = connectSessions(chain, hostKeyPrompt)
+        try {
+            val target = opened.last()
+            val channel = target.openChannel("sftp") as ChannelSftp
+            channel.connect(CONNECT_TIMEOUT_MS)
+            return SftpFileSystem(channel, opened)
+        } catch (t: Throwable) {
+            opened.asReversed().forEach { runCatching { it.disconnect() } }
+            throw t
+        }
+    }
+
+    private fun connectSessions(
+        chain: List<HopConfig>,
+        hostKeyPrompt: HostKeyPrompt,
+    ): List<Session> {
+        require(chain.isNotEmpty()) { "Connection chain must contain at least the target host" }
+
+        val jsch = JSch()
+        jsch.hostKeyRepository = buildHostKeyRepository()
+        val userInfo = HostKeyUserInfo(hostKeyPrompt)
+        val opened = ArrayList<Session>(chain.size)
+        try {
+            var previous: Session? = null
+            for (hop in chain) {
+                val (connectHost, connectPort) = if (previous == null) {
+                    hop.host to hop.port
+                } else {
+                    val localPort = previous.setPortForwardingL("127.0.0.1", 0, hop.host, hop.port)
+                    "127.0.0.1" to localPort
+                }
+
+                val session = jsch.getSession(hop.username, connectHost, connectPort)
+                applyAuth(jsch, session, hop)
+                session.hostKeyAlias = knownHostsAlias(hop.host, hop.port)
+                session.userInfo = userInfo
+                session.setConfig("StrictHostKeyChecking", "ask")
+                if (hop.allowLegacy) enableLegacyAlgorithms(session)
+                session.serverAliveInterval = KEEPALIVE_INTERVAL_MS
+                session.connect(CONNECT_TIMEOUT_MS)
+                opened.add(session)
+                previous = session
+            }
+            return opened
+        } catch (t: Throwable) {
+            opened.asReversed().forEach { runCatching { it.disconnect() } }
+            throw t
         } finally {
-            // JSch has copied the credentials it needs by now; drop our cleartext.
             wipeSecrets(chain)
         }
     }

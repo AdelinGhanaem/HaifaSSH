@@ -22,6 +22,8 @@ class SshSession {
 
     var authType: SshAuthType = SshAuthType.PASSWORD
     var privateKeyPath: String = ""
+    
+    var protocol: SessionProtocol = SessionProtocol.SSH
 
     /** When true, password / passphrase are persisted in PasswordSafe; otherwise prompted each connect. */
     var savePassword: Boolean = true
@@ -64,6 +66,7 @@ class SshSession {
         c.username = username
         c.authType = authType
         c.privateKeyPath = privateKeyPath
+        c.protocol = protocol
         c.savePassword = savePassword
         c.allowLegacyAlgorithms = allowLegacyAlgorithms
         c.iconKey = iconKey

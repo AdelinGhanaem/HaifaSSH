@@ -17,6 +17,8 @@ import javax.swing.JPanel
 import javax.swing.JPopupMenu
 import javax.swing.JRadioButtonMenuItem
 
+import com.haifasoft.haifassh.ssh.SshShellHandle
+
 /**
  * The companion panel docked next to a terminal: a small header (title + a gear
  * that moves the panel to any side) over a two-tab pane — History and Commands.
@@ -29,12 +31,16 @@ class TerminalAssistantPanel(
     hostKey: String,
     typeText: (String) -> Unit,
     parentDisposable: Disposable,
+    handle: SshShellHandle? = null,
 ) : JBPanel<TerminalAssistantPanel>(BorderLayout()) {
 
     init {
         add(buildHeader(), BorderLayout.NORTH)
 
         val tabs = JBTabbedPane().apply {
+            if (project != null) {
+                addTab("SFTP Files", AllIcons.Nodes.Folder, SftpTab(project, session, parentDisposable, handle, typeText))
+            }
             addTab("History", AllIcons.Vcs.History, CommandHistoryTab(hostKey, typeText, parentDisposable))
             addTab("Commands", CommandSnippetsTab(project, session.id, session.displayName(), typeText, parentDisposable))
         }

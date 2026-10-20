@@ -50,6 +50,11 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.13.0 — <b>SFTP &amp; FTP File Browser</b>: full remote file browser supporting
+                SFTP (over active SSH sessions without re-authenticating, or standalone) and FTP.
+                Available alongside the terminal in a split pane, in a dedicated <em>SFTP Browser</em>
+                tool window, or as a standalone tab. Supports drag-and-drop uploads, copy/paste,
+                remote file navigation, directory management, and downloading files into the IDE.</li>
             <li>0.12.0 — <b>Drag &amp; drop</b>: drag sessions and folders between folders to
                 reorganize the tree, and drop them <em>between</em> two rows to arrange the
                 list in exactly the order you want. The manual order is saved with the
@@ -126,10 +131,19 @@
                     icon="/icons/sshTerminals.svg"
                     factoryClass="com.haifasoft.haifassh.terminal.SshTerminalsToolWindowFactory"/>
 
+        <toolWindow id="SFTP Browser"
+                    anchor="right"
+                    canCloseContents="false"
+                    icon="/icons/sshSessions.svg"
+                    factoryClass="com.haifasoft.haifassh.fs.ui.SftpBrowserToolWindowFactory"/>
+
         <notificationGroup id="HaifaSSH" displayType="BALLOON"/>
 
         <!-- Opens SSH terminals as editor tabs (where source files open). -->
         <fileEditorProvider implementation="com.haifasoft.haifassh.terminal.editor.SshTerminalFileEditorProvider"/>
+
+        <!-- Opens SFTP / FTP file browsers as editor tabs. -->
+        <fileEditorProvider implementation="com.haifasoft.haifassh.fs.editor.RemoteFileBrowserFileEditorProvider"/>
 
         <!-- Settings → Tools → HaifaSSH Terminal: terminal color scheme / templates. -->
         <applicationConfigurable parentId="tools"

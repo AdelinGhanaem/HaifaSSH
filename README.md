@@ -12,7 +12,7 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
 > system, how this plugin is implemented, a file-by-file code guide, and a full
 > security report.
 
-## Features (v0.12.0)
+## Features (v0.13.0)
 
 - **Session tree** — folders + sessions in the left-hand *SSH Sessions* tool window.
 - **Customizable appearance** — give each session a built-in **icon** (server, database,
@@ -36,6 +36,16 @@ keep credentials in the IDE Password Safe. Free and open source (MIT).
 - **Embedded SSH terminals** — double-click a session (or use the ▶ toolbar button)
   to open a real interactive shell (powered by
   [JediTerm](https://github.com/JetBrains/jediterm) + JSch).
+- **SSH, SFTP, and FTP protocols** — define sessions as **SSH**, **SFTP**, or **FTP**.
+  Double-clicking an SFTP or FTP session opens directly into the file browser without launching
+  an SSH shell. An "Open SSH Terminal" button is readily available in the file browser whenever SSH is supported.
+- **Embedded SFTP / FTP file browser** — navigate remote directories, create folders, rename,
+  delete, and download files directly into the IDE.
+- **Drag & drop upload** — drag files directly from your desktop or the IntelliJ Project View and drop
+  them into the remote file browser to upload with background progress and cancellation.
+- **Split-pane file browser alongside terminal** — by default, live SSH terminals open with the
+  SFTP browser right in the side panel (alongside Command History & Snippets). Toggle, hide, or dock
+  it to the left, right, top, or bottom anytime.
 - **Terminal opens as an editor tab** — by default the shell opens in the editor area,
   right where source files open. Toggle the *Open Terminals in Editor Tab* button in the
   *SSH Sessions* toolbar to fall back to the bottom *SSH Terminals* tool window instead.
@@ -113,8 +123,8 @@ files that are already bundled inside the ZIP).
 | UI | `ui/SshSessionsPanel` (tree + toolbar), `SshSessionDialog`, `JumpHostDialog`, `ExportOptionsDialog`, `TerminalAppearanceConfigurable` (color settings) |
 
 ## Roadmap
-
-- SFTP file browser for the active session
+ 
+- [x] SFTP file browser for the active session and standalone SFTP/FTP client
 - ssh-agent / `~/.ssh/config` import
 - Per-session terminal color schemes & startup commands
 

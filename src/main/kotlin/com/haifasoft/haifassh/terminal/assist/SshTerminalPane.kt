@@ -10,6 +10,7 @@ import com.intellij.util.ui.JBUI
 import com.jediterm.terminal.ui.JediTermWidget
 import com.haifasoft.haifassh.model.SshSession
 import com.haifasoft.haifassh.settings.HaifaSshSettings
+import com.haifasoft.haifassh.ssh.SshShellHandle
 import java.awt.BorderLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -30,10 +31,11 @@ class SshTerminalPane(
     session: SshSession,
     hostKey: String,
     parentDisposable: Disposable,
+    handle: SshShellHandle? = null,
 ) : Disposable {
 
     private val splitter = OnePixelSplitter()
-    private val assistant = TerminalAssistantPanel(project, session, hostKey, ::typeText, parentDisposable)
+    private val assistant = TerminalAssistantPanel(project, session, hostKey, ::typeText, parentDisposable, handle)
 
     /**
      * Permanent host. The [splitter] (which always contains the live [widget]) fills the

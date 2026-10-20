@@ -29,6 +29,8 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.IconUtil
 import com.intellij.util.containers.Convertor
 import com.intellij.util.ui.JBUI
+import com.haifasoft.haifassh.fs.RemoteFileManager
+import com.haifasoft.haifassh.model.SessionProtocol
 import com.haifasoft.haifassh.model.SshFolder
 import com.haifasoft.haifassh.model.SshSession
 import com.haifasoft.haifassh.settings.HaifaSshSettings
@@ -157,6 +159,7 @@ class SshSessionsPanel(
             .setEditAction { editSelected() }
             .setRemoveAction { removeSelected() }
             .addExtraAction(ConnectAction())
+            .addExtraAction(OpenSftpAction())
             .addExtraAction(NewFolderAction())
             .addExtraAction(ImportAction())
             .addExtraAction(ExportAction())
@@ -330,7 +333,12 @@ class SshSessionsPanel(
     }
 
     private fun connectSelected() {
-        selectedSession()?.let { SshTerminalManager.getInstance(project).connect(it) }
+        val session = selectedSession() ?: return
+        if (session.protocol == SessionProtocol.SSH) {
+            SshTerminalManager.getInstance(project).connect(session)
+        } else {
+            RemoteFileManager.getInstance(project).openBrowser(session)
+        }
     }
 
     /** Opens a pre-filled "Duplicate" dialog for the selected session (secrets included). */
@@ -524,6 +532,8 @@ class SshSessionsPanel(
             add(NewSubfolderAction())
             addSeparator()
             add(ConnectAction())
+            add(OpenSftpAction())
+            add(OpenInToolWindowAction())
             add(DuplicateAction())
             addSeparator()
             add(RenameAction())
@@ -666,6 +676,38 @@ class SshSessionsPanel(
 
         override fun update(e: AnActionEvent) {
             // Single session only — avoid accidentally opening many terminals.
+            e.presentation.isEnabled = selectedNodes().size == 1 && selectedSession() != null
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    private inner class OpenSftpAction : DumbAwareAction(
+        "Open File Browser",
+        "Open the remote SFTP/FTP file browser for the selected session",
+        AllIcons.Nodes.Folder,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) {
+            selectedSession()?.let { RemoteFileManager.getInstance(project).openBrowser(it) }
+        }
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = selectedNodes().size == 1 && selectedSession() != null
+        }
+
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+    }
+
+    private inner class OpenInToolWindowAction : DumbAwareAction(
+        "Open in SFTP Tool Window",
+        "Open this session in the dedicated SFTP Browser tool window",
+        AllIcons.Nodes.Folder,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) {
+            selectedSession()?.let { RemoteFileManager.getInstance(project).openInToolWindow(it) }
+        }
+
+        override fun update(e: AnActionEvent) {
             e.presentation.isEnabled = selectedNodes().size == 1 && selectedSession() != null
         }
 

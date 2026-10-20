@@ -1,5 +1,6 @@
 package com.haifasoft.haifassh.ui
 
+import com.haifasoft.haifassh.model.SessionProtocol
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
@@ -44,6 +45,17 @@ class SshSessionDialog(
 ) : DialogWrapper(project) {
 
     private val nameField = JBTextField(session.name)
+    private val protocolCombo = ComboBox(arrayOf(SessionProtocol.SSH, SessionProtocol.SFTP, SessionProtocol.FTP)).apply {
+        selectedItem = session.protocol
+        renderer = SimpleListCellRenderer.create("") { protocol ->
+            when (protocol) {
+                SessionProtocol.SSH -> "SSH (Terminal & SFTP)"
+                SessionProtocol.SFTP -> "SFTP (File Browser)"
+                SessionProtocol.FTP -> "FTP (File Browser)"
+                else -> protocol?.name ?: ""
+            }
+        }
+    }
     private val hostField = JBTextField(session.host)
     private val portField = JBIntSpinner(session.port.coerceIn(1, 65535), 1, 65535)
     private val usernameField = JBTextField(session.username)
@@ -114,26 +126,39 @@ class SshSessionDialog(
             }
         }
 
+        protocolCombo.addActionListener {
+            val proto = protocolCombo.selectedItem as? SessionProtocol ?: SessionProtocol.SSH
+            if (proto == SessionProtocol.FTP) {
+                if (portField.number == 22) portField.number = 21
+            } else {
+                if (portField.number == 21) portField.number = 22
+            }
+            updateAuthFields()
+        }
         authCombo.addActionListener { updateAuthFields() }
         init()
         updateAuthFields()
     }
 
+    private var jumpPanel: JPanel? = null
+
     override fun createCenterPanel(): JComponent {
-        val jumpPanel = ToolbarDecorator.createDecorator(jumpList)
+        val createdJump = ToolbarDecorator.createDecorator(jumpList)
             .setAddAction { addJump() }
             .setEditAction { editJump() }
             .setRemoveAction { removeJump() }
             .setPreferredSize(JBUI.size(360, 110))
             .createPanel()
+        jumpPanel = createdJump
 
         val colorRow = JPanel(FlowLayout(FlowLayout.LEFT, 6, 0)).apply {
             add(colorPanel)
             add(resetColorButton)
         }
 
-        return FormBuilder.createFormBuilder()
+        val panel = FormBuilder.createFormBuilder()
             .addLabeledComponent("Name:", nameField)
+            .addLabeledComponent("Protocol:", protocolCombo)
             .addLabeledComponent("Host:", hostField)
             .addLabeledComponent("Port:", portField)
             .addLabeledComponent("Username:", usernameField)
@@ -145,15 +170,29 @@ class SshSessionDialog(
             .addComponent(allowLegacyCheck)
             .addLabeledComponent("Icon:", iconCombo)
             .addLabeledComponent("Color:", colorRow)
-            .addLabeledComponentFillVertically("Jump hosts:", jumpPanel)
+            .addLabeledComponentFillVertically("Jump hosts:", createdJump)
             .panel
+
+        updateAuthFields()
+        return panel
     }
 
     private fun updateAuthFields() {
-        val key = authCombo.selectedItem == SshAuthType.KEY
-        passwordField.isEnabled = !key
-        keyPathField.isEnabled = key
-        passphraseField.isEnabled = key
+        val isFtp = protocolCombo.selectedItem == SessionProtocol.FTP
+        authCombo.isEnabled = !isFtp
+        allowLegacyCheck.isEnabled = !isFtp
+        jumpPanel?.isEnabled = !isFtp
+        if (isFtp) {
+            authCombo.selectedItem = SshAuthType.PASSWORD
+            passwordField.isEnabled = true
+            keyPathField.isEnabled = false
+            passphraseField.isEnabled = false
+        } else {
+            val key = authCombo.selectedItem == SshAuthType.KEY
+            passwordField.isEnabled = !key
+            keyPathField.isEnabled = key
+            passphraseField.isEnabled = key
+        }
     }
 
     private fun addJump() {
@@ -180,7 +219,8 @@ class SshSessionDialog(
     override fun doValidate(): ValidationInfo? {
         if (hostField.text.isBlank()) return ValidationInfo("Host is required", hostField)
         if (usernameField.text.isBlank()) return ValidationInfo("Username is required", usernameField)
-        if (authCombo.selectedItem == SshAuthType.KEY && keyPathField.text.isBlank()) {
+        val isFtp = protocolCombo.selectedItem == SessionProtocol.FTP
+        if (!isFtp && authCombo.selectedItem == SshAuthType.KEY && keyPathField.text.isBlank()) {
             return ValidationInfo("Private key path is required for key authentication", keyPathField)
         }
         return null
@@ -189,6 +229,7 @@ class SshSessionDialog(
     /** Writes the edited values + secrets through the service. Call after [showAndGet] returns true. */
     fun persist(service: SshSessionService): SshSession {
         session.name = nameField.text.trim()
+        session.protocol = protocolCombo.selectedItem as? SessionProtocol ?: SessionProtocol.SSH
         session.host = hostField.text.trim()
         session.port = portField.number
         session.username = usernameField.text.trim()
@@ -198,7 +239,7 @@ class SshSessionDialog(
         session.allowLegacyAlgorithms = allowLegacyCheck.isSelected
         session.iconKey = (iconCombo.selectedItem as? SessionIcons.Choice)?.key.orEmpty()
         session.color = colorPanel.selectedColor?.let { AppearanceColors.toHex(it) } ?: ""
-        session.jumpHosts = jumpModel.items.map { it.host }.toMutableList()
+        session.jumpHosts = if (session.protocol == SessionProtocol.FTP) mutableListOf() else jumpModel.items.map { it.host }.toMutableList()
 
         val saved = service.upsertSession(session)
         persistSecrets(saved)

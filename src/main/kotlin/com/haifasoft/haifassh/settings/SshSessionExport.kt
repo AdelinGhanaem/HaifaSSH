@@ -35,6 +35,7 @@ class SshSessionExport {
     var username: String = ""
     var authType: SshAuthType = SshAuthType.PASSWORD
     var privateKeyPath: String = ""
+    var protocol: com.haifasoft.haifassh.model.SessionProtocol = com.haifasoft.haifassh.model.SessionProtocol.SSH
     var savePassword: Boolean = true
     var allowLegacyAlgorithms: Boolean = false
     var iconKey: String = ""

@@ -60,6 +60,6 @@ object SshTerminalUi {
     ): SshTerminalPane {
         val hostKey = SshCommandHistoryService.getInstance().hostKey(session.host)
         val widget = createWidget(session, handle, parentDisposable, TerminalCommandRecorder(hostKey))
-        return SshTerminalPane(widget, project, session, hostKey, parentDisposable)
+        return SshTerminalPane(widget, project, session, hostKey, parentDisposable, handle)
     }
 }

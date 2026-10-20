@@ -95,6 +95,7 @@ object SshSessionTransfer {
             e.username = username
             e.authType = authType
             e.privateKeyPath = privateKeyPath
+            e.protocol = protocol
             e.savePassword = savePassword
             e.allowLegacyAlgorithms = allowLegacyAlgorithms
             e.iconKey = iconKey
@@ -174,6 +175,7 @@ object SshSessionTransfer {
                 it.username = s.username
                 it.authType = s.authType
                 it.privateKeyPath = s.privateKeyPath
+                it.protocol = s.protocol
                 it.savePassword = s.savePassword
                 it.allowLegacyAlgorithms = s.allowLegacyAlgorithms
                 it.iconKey = s.iconKey

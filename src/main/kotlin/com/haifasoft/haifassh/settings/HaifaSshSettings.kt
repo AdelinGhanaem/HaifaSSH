@@ -79,11 +79,11 @@ class HaifaSshSettingsState {
     var assistantPanelPosition: String = "right"
 
     /**
-     * Whether the per-terminal assistant panel is shown. Hidden by default so a
-     * fresh terminal is all shell; the user reveals it from the edge toggle.
+     * Whether the per-terminal assistant panel (SFTP Files, History, Commands) is shown.
+     * Shown by default as a split panel; user can hide it via close button or settings.
      * Applies live to open terminals and to newly opened ones.
      */
-    var assistantPanelVisible: Boolean = false
+    var assistantPanelVisible: Boolean = true
 }
 
 /**

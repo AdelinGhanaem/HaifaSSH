@@ -25,6 +25,7 @@ replay_pid*
 Thumbs.db
 *~
 *.swp
+.vscode/
 
 # ── Local config & secrets (never commit credentials) ──────────────────
 local.properties
