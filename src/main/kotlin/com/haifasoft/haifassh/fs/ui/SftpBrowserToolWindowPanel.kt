@@ -42,8 +42,8 @@ class SftpBrowserToolWindowPanel(
     private val sessionCombo = ComboBox<SshSession>().apply {
         renderer = SimpleListCellRenderer.create("<No Sessions Configured>") { it?.displayName().orEmpty() }
     }
-    private val connectBtn = InplaceButton("Connect", AllIcons.Actions.Execute) { connectCurrentSession() }
-    private val disconnectBtn = InplaceButton("Disconnect", AllIcons.Actions.Suspend) { disconnectCurrent() }.apply { isEnabled = false }
+    private val connectBtn = HoverIconButton("Connect to Session", AllIcons.Actions.Execute) { connectCurrentSession() }
+    private val disconnectBtn = HoverIconButton("Disconnect Session", AllIcons.Actions.Suspend) { disconnectCurrent() }.apply { isEnabled = false }
 
     private val cardLayout = CardLayout()
     private val contentPanel = JPanel(cardLayout)
@@ -67,7 +67,7 @@ class SftpBrowserToolWindowPanel(
                 isOpaque = false
                 add(JBLabel("Session:"))
                 add(sessionCombo)
-                add(InplaceButton("Refresh Sessions", AllIcons.Actions.Refresh) { reloadSessions() })
+                add(HoverIconButton("Refresh Sessions", AllIcons.Actions.Refresh) { reloadSessions() })
             }
             val right = JPanel(FlowLayout(FlowLayout.RIGHT, 4, 0)).apply {
                 isOpaque = false

@@ -27,6 +27,7 @@ import com.haifasoft.haifassh.fs.RemoteFileSystem
 import com.haifasoft.haifassh.model.SessionProtocol
 import com.haifasoft.haifassh.model.SshSession
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
@@ -44,6 +45,8 @@ import java.util.Date
 import javax.swing.JMenuItem
 import javax.swing.JPanel
 import javax.swing.JPopupMenu
+import javax.swing.JSeparator
+import javax.swing.SwingConstants
 import javax.swing.ListSelectionModel
 import javax.swing.table.AbstractTableModel
 import javax.swing.table.DefaultTableCellRenderer
@@ -93,7 +96,7 @@ class RemoteFileBrowserPanel(
     }
 
     private fun setupTable() {
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
+        table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
         table.autoCreateRowSorter = true
         table.rowHeight = JBUI.scale(22)
         table.setShowGrid(false)
@@ -206,6 +209,25 @@ class RemoteFileBrowserPanel(
         })
     }
 
+    private var localExplorerWindow: LocalFileExplorerWindow? = null
+
+    private fun openLocalFileExplorer() {
+        var w = localExplorerWindow
+        if (w == null || !w.isDisplayable) {
+            w = LocalFileExplorerWindow(project, session) { filesToUpload ->
+                uploadLocalFiles(filesToUpload, currentPath)
+            }
+            localExplorerWindow = w
+        }
+        w.isVisible = true
+        w.toFront()
+    }
+
+    private fun createVerticalSeparator(): JSeparator = JSeparator(SwingConstants.VERTICAL).apply {
+        preferredSize = Dimension(JBUI.scale(6), JBUI.scale(20))
+        foreground = UIUtil.getBoundsColor()
+    }
+
     private fun buildToolbar(): JPanel {
         val panel = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.compound(
@@ -214,44 +236,71 @@ class RemoteFileBrowserPanel(
             )
         }
 
-        val navButtons = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0)).apply {
+        // Row 1: Address bar (Full width above the icons)
+        val addressBar = JPanel(BorderLayout(JBUI.scale(4), 0)).apply {
             isOpaque = false
-            add(InplaceButton("Back", AllIcons.Actions.Back) { navigateBack() })
-            add(InplaceButton("Forward", AllIcons.Actions.Forward) { navigateForward() })
-            add(InplaceButton("Up Folder", AllIcons.Nodes.UpFolder) { navigateUp() })
-            add(InplaceButton("Refresh (F5)", AllIcons.Actions.Refresh) { refreshCurrentDirectory() })
+            border = JBUI.Borders.empty(2, 0, 4, 0)
         }
-
         pathField.addActionListener {
             val text = pathField.text.trim()
             if (text.isNotBlank()) {
                 navigateTo(text, addToHistory = true)
             }
         }
+        val goBtn = HoverIconButton("Go to path (Enter)", AllIcons.Actions.Forward) {
+            val text = pathField.text.trim()
+            if (text.isNotBlank()) {
+                navigateTo(text, addToHistory = true)
+            }
+        }
+        addressBar.add(pathField, BorderLayout.CENTER)
+        addressBar.add(goBtn, BorderLayout.EAST)
+
+        // Row 2: Icons bar (below the address bar)
+        val iconBar = JPanel(BorderLayout()).apply {
+            isOpaque = false
+        }
+
+        val navButtons = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0)).apply {
+            isOpaque = false
+            add(HoverIconButton("Back", AllIcons.Actions.Back) { navigateBack() })
+            add(HoverIconButton("Forward", AllIcons.Actions.Forward) { navigateForward() })
+            add(HoverIconButton("Up Folder", AllIcons.Nodes.UpFolder) { navigateUp() })
+            add(HoverIconButton("Refresh (F5)", AllIcons.Actions.Refresh) { refreshCurrentDirectory() })
+
+            add(createVerticalSeparator())
+
+            add(HoverIconButton("Open Local File Explorer (Drag & Drop files)", AllIcons.Nodes.Desktop) {
+                openLocalFileExplorer()
+            })
+        }
 
         val actionButtons = JPanel(FlowLayout(FlowLayout.RIGHT, 4, 0)).apply {
             isOpaque = false
-            add(InplaceButton("New Folder", AllIcons.Actions.NewFolder) { promptNewFolder() })
-            add(InplaceButton("Upload File(s)...", AllIcons.Actions.Upload) { promptUploadFiles() })
-            add(InplaceButton("Download Selected", AllIcons.Actions.Download) { downloadSelectedFile() })
-            add(InplaceButton("Delete Selected", AllIcons.Actions.Cancel) { deleteSelectedFile() })
+            add(HoverIconButton("New Folder", AllIcons.Actions.NewFolder) { promptNewFolder() })
+            add(HoverIconButton("Upload File(s)...", AllIcons.Actions.Upload) { promptUploadFiles() })
+            add(HoverIconButton("Download Selected", AllIcons.Actions.Download) { downloadSelectedFile() })
+            add(HoverIconButton("Delete Selected (Del)", AllIcons.Actions.Cancel) { deleteSelectedFile() })
 
             // Button to open SSH terminal if available
             if (session.protocol != SessionProtocol.FTP && onOpenTerminal != null) {
-                add(InplaceButton("Open SSH Terminal", AllIcons.Debugger.Console) {
+                add(createVerticalSeparator())
+                add(HoverIconButton("Open SSH Terminal", AllIcons.Debugger.Console) {
                     onOpenTerminal.invoke()
                 })
             }
             if (onCdInTerminal != null) {
-                add(InplaceButton("cd Terminal Here", AllIcons.Debugger.Console) {
+                add(HoverIconButton("cd Terminal Here", AllIcons.Actions.Execute) {
                     onCdInTerminal.invoke(currentPath)
                 })
             }
         }
 
-        panel.add(navButtons, BorderLayout.WEST)
-        panel.add(pathField, BorderLayout.CENTER)
-        panel.add(actionButtons, BorderLayout.EAST)
+        iconBar.add(navButtons, BorderLayout.WEST)
+        iconBar.add(actionButtons, BorderLayout.EAST)
+
+        panel.add(addressBar, BorderLayout.NORTH)
+        panel.add(iconBar, BorderLayout.SOUTH)
         return panel
     }
 
@@ -305,9 +354,9 @@ class RemoteFileBrowserPanel(
         if (row >= 0 && !table.isRowSelected(row)) {
             table.setRowSelectionInterval(row, row)
         }
-        val selectedFile = if (table.selectedRow >= 0) {
-            tableModel.getFileAt(table.convertRowIndexToModel(table.selectedRow))
-        } else null
+        val rows = table.selectedRows
+        val selectedFiles = rows.map { tableModel.getFileAt(table.convertRowIndexToModel(it)) }.filterNotNull()
+        val selectedFile = if (selectedFiles.size == 1) selectedFiles[0] else null
 
         val menu = JPopupMenu()
         if (selectedFile != null && !selectedFile.isDirectory) {
@@ -317,10 +366,20 @@ class RemoteFileBrowserPanel(
             menu.add(JMenuItem("Download to...", AllIcons.Actions.Download).apply {
                 addActionListener { promptDownloadTarget(selectedFile) }
             })
+        } else if (selectedFiles.size > 1) {
+            val nonDirFiles = selectedFiles.filter { !it.isDirectory }
+            if (nonDirFiles.isNotEmpty()) {
+                menu.add(JMenuItem("Download (${nonDirFiles.size} files) to...", AllIcons.Actions.Download).apply {
+                    addActionListener { promptDownloadTargetForMultiple(nonDirFiles) }
+                })
+            }
         }
 
         menu.add(JMenuItem("Upload Files Here...", AllIcons.Actions.Upload).apply {
             addActionListener { promptUploadFiles() }
+        })
+        menu.add(JMenuItem("Open Local File Explorer...", AllIcons.Nodes.Desktop).apply {
+            addActionListener { openLocalFileExplorer() }
         })
         menu.add(JMenuItem("New Folder...", AllIcons.Actions.NewFolder).apply {
             addActionListener { promptNewFolder() }
@@ -346,6 +405,17 @@ class RemoteFileBrowserPanel(
             menu.add(JMenuItem("Copy Remote Path", AllIcons.Actions.Copy).apply {
                 addActionListener {
                     val sel = StringSelection(selectedFile.path)
+                    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(sel, sel)
+                }
+            })
+        } else if (selectedFiles.size > 1) {
+            menu.add(JMenuItem("Delete (${selectedFiles.size} items)", AllIcons.Actions.Cancel).apply {
+                addActionListener { deleteSelectedFile() }
+            })
+            menu.addSeparator()
+            menu.add(JMenuItem("Copy (${selectedFiles.size} paths)", AllIcons.Actions.Copy).apply {
+                addActionListener {
+                    val sel = StringSelection(selectedFiles.joinToString("\n") { it.path })
                     java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(sel, sel)
                 }
             })
@@ -511,20 +581,88 @@ class RemoteFileBrowserPanel(
     }
 
     private fun deleteSelectedFile() {
-        val row = table.selectedRow
-        if (row >= 0) {
-            val file = tableModel.getFileAt(table.convertRowIndexToModel(row)) ?: return
-            confirmAndDelete(file)
+        val rows = table.selectedRows
+        if (rows.isEmpty()) return
+        val files = rows.map { tableModel.getFileAt(table.convertRowIndexToModel(it)) }.filterNotNull()
+        if (files.isEmpty()) return
+
+        if (files.size == 1) {
+            confirmAndDelete(files[0])
+        } else {
+            val answer = Messages.showYesNoDialog(
+                this,
+                "Are you sure you want to delete ${files.size} selected items?",
+                "Delete ${files.size} Items",
+                Messages.getWarningIcon()
+            )
+            if (answer != Messages.YES) return
+
+            object : Task.Backgroundable(project, "Deleting ${files.size} items", true) {
+                override fun run(indicator: ProgressIndicator) {
+                    indicator.isIndeterminate = false
+                    for ((index, file) in files.withIndex()) {
+                        if (indicator.isCanceled) break
+                        indicator.text = "Deleting ${file.name} (${index + 1}/${files.size})"
+                        indicator.fraction = index.toDouble() / files.size.toDouble()
+                        fs.delete(file.path, file.isDirectory)
+                    }
+                }
+
+                override fun onSuccess() {
+                    refreshCurrentDirectory()
+                }
+
+                override fun onThrowable(error: Throwable) {
+                    notifyError("Failed to delete items: ${error.message}")
+                }
+            }.queue()
         }
     }
 
     private fun downloadSelectedFile() {
-        val row = table.selectedRow
-        if (row >= 0) {
-            val file = tableModel.getFileAt(table.convertRowIndexToModel(row)) ?: return
-            if (!file.isDirectory) {
-                promptDownloadTarget(file)
-            }
+        val rows = table.selectedRows
+        if (rows.isEmpty()) return
+        val files = rows.map { tableModel.getFileAt(table.convertRowIndexToModel(it)) }.filterNotNull().filter { !it.isDirectory }
+        if (files.isEmpty()) return
+
+        if (files.size == 1) {
+            promptDownloadTarget(files[0])
+        } else {
+            promptDownloadTargetForMultiple(files)
+        }
+    }
+
+    private fun promptDownloadTargetForMultiple(files: List<RemoteFile>) {
+        val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
+        val chooser = FileChooserFactory.getInstance().createFileChooser(descriptor, project, this)
+        val selected = chooser.choose(project)
+        if (selected.isNotEmpty()) {
+            val targetDir = File(selected[0].path)
+            object : Task.Backgroundable(project, "Downloading ${files.size} files", true) {
+                override fun run(indicator: ProgressIndicator) {
+                    indicator.isIndeterminate = false
+                    for ((index, file) in files.withIndex()) {
+                        if (indicator.isCanceled) break
+                        indicator.text = "Downloading ${file.name} (${index + 1}/${files.size})"
+                        indicator.fraction = index.toDouble() / files.size.toDouble()
+                        val destination = File(targetDir, file.name)
+                        fs.download(file.path, destination) { _, _ -> }
+                    }
+                }
+
+                override fun onSuccess() {
+                    ApplicationManager.getApplication().invokeLater {
+                        NotificationGroupManager.getInstance()
+                            .getNotificationGroup("HaifaSSH")
+                            .createNotification("Downloaded ${files.size} file(s) to ${targetDir.name}", NotificationType.INFORMATION)
+                            .notify(project)
+                    }
+                }
+
+                override fun onThrowable(error: Throwable) {
+                    notifyError("Download failed: ${error.message}")
+                }
+            }.queue()
         }
     }
 
