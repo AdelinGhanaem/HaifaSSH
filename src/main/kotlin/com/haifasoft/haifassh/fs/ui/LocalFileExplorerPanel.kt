@@ -119,11 +119,13 @@ class LocalFileExplorerPanel(
         onPositionChanged?.invoke(pos)
     }
 
-    private fun updateHeaderButtons() {
+    fun updateHeaderButtons() {
         if (currentViewMode.isDocked) {
+            dockToggleBtn.icon = AllIcons.Actions.MoveToWindow
             dockToggleBtn.toolTipText = "Detach to Window / Float"
             dockToggleBtn.repaint()
         } else {
+            dockToggleBtn.icon = AllIcons.Actions.PinTab
             dockToggleBtn.toolTipText = "Put back to dock (Side-by-Side)"
             dockToggleBtn.repaint()
         }

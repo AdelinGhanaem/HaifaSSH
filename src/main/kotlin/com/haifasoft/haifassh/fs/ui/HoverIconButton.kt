@@ -22,7 +22,7 @@ import javax.swing.ToolTipManager
  */
 class HoverIconButton(
     val tooltip: String,
-    val icon: Icon,
+    var icon: Icon,
     private val action: () -> Unit,
 ) : JComponent() {
 

@@ -252,13 +252,17 @@ class RemoteFileBrowserPanel(
 
     private fun updateCenterLayout() {
         centerContainer.removeAll()
+        localWindow?.detachPanel()
+        splitter.firstComponent = null
+        splitter.secondComponent = null
 
         if (!isLocalExplorerOpen) {
             localWindow?.isVisible = false
             centerContainer.add(remoteCenterPanel, BorderLayout.CENTER)
         } else if (localViewMode.isDocked) {
             localWindow?.isVisible = false
-            splitter.orientation = (dockPosition == DockPosition.UP || dockPosition == DockPosition.DOWN)
+            val isVertical = (dockPosition == DockPosition.UP || dockPosition == DockPosition.DOWN)
+            splitter.orientation = isVertical
             if (dockPosition == DockPosition.LEFT || dockPosition == DockPosition.UP) {
                 splitter.firstComponent = localExplorerPanel
                 splitter.secondComponent = remoteCenterPanel
@@ -276,12 +280,19 @@ class RemoteFileBrowserPanel(
             win.toFront()
         }
 
+        localExplorerPanel.updateHeaderButtons()
         centerContainer.revalidate()
         centerContainer.repaint()
+        revalidate()
+        repaint()
     }
 
     fun toggleLocalExplorer(open: Boolean) {
         isLocalExplorerOpen = open
+        if (open && !localViewMode.isDocked) {
+            localViewMode = LocalViewMode.DOCKED_PINNED
+            localExplorerPanel.setViewMode(LocalViewMode.DOCKED_PINNED)
+        }
         updateCenterLayout()
     }
 

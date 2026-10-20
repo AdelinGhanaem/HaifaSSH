@@ -49,4 +49,10 @@ class LocalFileExplorerWindow(
         contentPane.revalidate()
         contentPane.repaint()
     }
+
+    fun detachPanel() {
+        contentPane.removeAll()
+        contentPane.revalidate()
+        contentPane.repaint()
+    }
 }
