@@ -20,13 +20,61 @@ class FileTableTypeAhead(
     private var lastKeyTime = 0L
 
     companion object {
+        const val TIMEOUT_MS = 1500L
+
         fun installOn(table: JTable, getFileName: (modelRow: Int) -> String?): FileTableTypeAhead {
             val listener = FileTableTypeAhead(table, getFileName)
             table.addKeyListener(listener)
+            table.addFocusListener(object : java.awt.event.FocusAdapter() {
+                override fun focusLost(e: java.awt.event.FocusEvent?) {
+                    listener.clear()
+                }
+            })
             runCatching {
                 TableSpeedSearch.installOn(table)
             }
             return listener
+        }
+    }
+
+    fun hasActiveBuffer(): Boolean {
+        val now = System.currentTimeMillis()
+        return buffer.isNotEmpty() && (now - lastKeyTime <= TIMEOUT_MS)
+    }
+
+    fun getBuffer(): String = buffer.toString()
+
+    fun clear() {
+        buffer.setLength(0)
+        lastKeyTime = 0L
+    }
+
+    override fun keyPressed(e: KeyEvent) {
+        when (e.keyCode) {
+            KeyEvent.VK_BACK_SPACE -> {
+                val now = System.currentTimeMillis()
+                if (now - lastKeyTime > TIMEOUT_MS) {
+                    buffer.setLength(0)
+                }
+
+                if (buffer.isNotEmpty()) {
+                    buffer.deleteCharAt(buffer.length - 1)
+                    lastKeyTime = now
+                    if (buffer.isNotEmpty()) {
+                        performSearch(buffer.toString().lowercase(), isSingleCharCycle = false)
+                    }
+                }
+                // ALWAYS consume Backspace on the file table. In a file table, Backspace
+                // is only used for editing type-ahead search queries, never for destructive
+                // navigation like deleting path segments or jumping to the root folder.
+                e.consume()
+            }
+            KeyEvent.VK_ESCAPE -> {
+                if (buffer.isNotEmpty()) {
+                    clear()
+                    e.consume()
+                }
+            }
         }
     }
 
@@ -38,20 +86,23 @@ class FileTableTypeAhead(
         if (ch == ' ' && buffer.isEmpty()) return
 
         val now = System.currentTimeMillis()
-        if (now - lastKeyTime > 1200L) {
+        if (now - lastKeyTime > TIMEOUT_MS) {
             buffer.setLength(0)
         }
         lastKeyTime = now
         buffer.append(ch)
 
         val query = buffer.toString().lowercase()
+        // Check if single repeating character (e.g. typing 'd', 'd', 'd' to cycle through D-items)
+        val isSingleCharCycle = query.length > 1 && query.all { it == query[0] }
+        performSearch(query, isSingleCharCycle)
+    }
+
+    fun performSearch(query: String, isSingleCharCycle: Boolean = false) {
         val rowCount = table.rowCount
         if (rowCount == 0) return
 
-        // Check if single repeating character (e.g. typing 'd', 'd', 'd' to cycle through D-items)
-        val isSingleCharCycle = query.length > 1 && query.all { it == query[0] }
         val searchPrefix = if (isSingleCharCycle) query.substring(0, 1) else query
-
         val currentRow = table.selectedRow.coerceAtLeast(0)
         val startIndex = if (isSingleCharCycle) (currentRow + 1) % rowCount else 0
 

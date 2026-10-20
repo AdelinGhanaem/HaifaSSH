@@ -88,6 +88,7 @@ class LocalFileExplorerPanel(
     private val selectionLabel = JBLabel("")
     private val tableModel = LocalFileTableModel()
     private val table = JBTable(tableModel)
+    private var typeAhead: FileTableTypeAhead? = null
 
     private val dockToggleBtn = HoverIconButton("Detach to Window", AllIcons.Actions.MoveToWindow) {
         val nextMode = if (currentViewMode.isDocked) LocalViewMode.WINDOW else LocalViewMode.DOCKED_PINNED
@@ -209,10 +210,10 @@ class LocalFileExplorerPanel(
         }
         val leftIcons = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0)).apply {
             isOpaque = false
-            add(HoverIconButton("Back", AllIcons.Actions.Back) { navigateBack() })
-            add(HoverIconButton("Forward", AllIcons.Actions.Forward) { navigateForward() })
-            add(HoverIconButton("Up Folder", AllIcons.Nodes.UpFolder) { navigateUp() })
-            add(HoverIconButton("Refresh", AllIcons.Actions.Refresh) { refreshCurrentDirectory() })
+            add(HoverIconButton("Back (Alt+Left)", AllIcons.Actions.Back) { navigateBack() })
+            add(HoverIconButton("Forward (Alt+Right)", AllIcons.Actions.Forward) { navigateForward() })
+            add(HoverIconButton("Up Folder (Alt+Up)", AllIcons.Nodes.UpFolder) { navigateUp() })
+            add(HoverIconButton("Refresh (F5)", AllIcons.Actions.Refresh) { refreshCurrentDirectory() })
 
             add(createVerticalSeparator())
 
@@ -356,7 +357,7 @@ class LocalFileExplorerPanel(
         table.setShowGrid(false)
 
         // Install SpeedSearch & File Explorer Type-ahead navigation (typing "Down" jumps to Downloads)
-        FileTableTypeAhead.installOn(table) { modelRow ->
+        typeAhead = FileTableTypeAhead.installOn(table) { modelRow ->
             tableModel.getFileAt(modelRow)?.name
         }
 
@@ -457,9 +458,23 @@ class LocalFileExplorerPanel(
                             e.consume()
                         }
                     }
-                    KeyEvent.VK_BACK_SPACE -> {
-                        navigateUp()
-                        e.consume()
+                    KeyEvent.VK_UP -> {
+                        if (e.isAltDown || e.isMetaDown) {
+                            navigateUp()
+                            e.consume()
+                        }
+                    }
+                    KeyEvent.VK_LEFT -> {
+                        if (e.isAltDown || e.isMetaDown) {
+                            navigateBack()
+                            e.consume()
+                        }
+                    }
+                    KeyEvent.VK_RIGHT -> {
+                        if (e.isAltDown || e.isMetaDown) {
+                            navigateForward()
+                            e.consume()
+                        }
                     }
                     KeyEvent.VK_F5 -> {
                         refreshCurrentDirectory()
@@ -556,6 +571,7 @@ class LocalFileExplorerPanel(
     }
 
     fun navigateTo(dir: File, addToHistory: Boolean = false) {
+        typeAhead?.clear()
         val canonical = runCatching { dir.canonicalFile }.getOrDefault(dir)
         if (!canonical.exists() || !canonical.isDirectory) return
 

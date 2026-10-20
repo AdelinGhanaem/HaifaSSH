@@ -70,6 +70,7 @@ class RemoteFileBrowserPanel(
     private val statusLabel = JBLabel("Loading...")
     private val tableModel = RemoteFileTableModel()
     private val table = JBTable(tableModel)
+    private var typeAhead: FileTableTypeAhead? = null
 
     private var isLocalExplorerOpen: Boolean = false
     private var localViewMode: LocalViewMode = LocalViewMode.DOCKED_PINNED
@@ -127,7 +128,7 @@ class RemoteFileBrowserPanel(
         table.setShowGrid(false)
 
         // Install SpeedSearch and File Explorer Type-ahead navigation (typing e.g. "Down" jumps to Downloads)
-        FileTableTypeAhead.installOn(table) { modelRow ->
+        typeAhead = FileTableTypeAhead.installOn(table) { modelRow ->
             tableModel.getFileAt(modelRow)?.name
         }
 
@@ -202,15 +203,32 @@ class RemoteFileBrowserPanel(
                             }
                         }
                     }
-                    KeyEvent.VK_BACK_SPACE -> {
-                        navigateUp()
-                        e.consume()
+                    KeyEvent.VK_UP -> {
+                        if (e.isAltDown || e.isMetaDown) {
+                            navigateUp()
+                            e.consume()
+                        }
+                    }
+                    KeyEvent.VK_LEFT -> {
+                        if (e.isAltDown || e.isMetaDown) {
+                            navigateBack()
+                            e.consume()
+                        }
+                    }
+                    KeyEvent.VK_RIGHT -> {
+                        if (e.isAltDown || e.isMetaDown) {
+                            navigateForward()
+                            e.consume()
+                        }
                     }
                     KeyEvent.VK_F5 -> {
                         refreshCurrentDirectory()
                         e.consume()
                     }
                     KeyEvent.VK_DELETE -> {
+                        if (typeAhead?.hasActiveBuffer() == true) {
+                            return
+                        }
                         val row = table.selectedRow
                         if (row >= 0) {
                             val file = tableModel.getFileAt(table.convertRowIndexToModel(row)) ?: return
@@ -356,9 +374,9 @@ class RemoteFileBrowserPanel(
 
         val navButtons = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0)).apply {
             isOpaque = false
-            add(HoverIconButton("Back", AllIcons.Actions.Back) { navigateBack() })
-            add(HoverIconButton("Forward", AllIcons.Actions.Forward) { navigateForward() })
-            add(HoverIconButton("Up Folder", AllIcons.Nodes.UpFolder) { navigateUp() })
+            add(HoverIconButton("Back (Alt+Left)", AllIcons.Actions.Back) { navigateBack() })
+            add(HoverIconButton("Forward (Alt+Right)", AllIcons.Actions.Forward) { navigateForward() })
+            add(HoverIconButton("Up Folder (Alt+Up)", AllIcons.Nodes.UpFolder) { navigateUp() })
             add(HoverIconButton("Refresh (F5)", AllIcons.Actions.Refresh) { refreshCurrentDirectory() })
 
             add(createVerticalSeparator())
@@ -530,6 +548,7 @@ class RemoteFileBrowserPanel(
     }
 
     fun navigateTo(path: String, addToHistory: Boolean = false) {
+        typeAhead?.clear()
         val targetPath = if (path.isBlank()) "/" else path
         pathField.text = targetPath
         statusLabel.text = "Loading $targetPath..."
