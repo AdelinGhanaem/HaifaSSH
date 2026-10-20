@@ -50,6 +50,11 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.14.0 — <b>Local File Explorer &amp; Enhanced Toolbar</b>:
+                standalone local file system explorer window with multi-file selection and
+                direct drag-and-drop into active remote sessions; revamped remote file browser
+                layout with full-width address bar placed above action buttons; responsive hover
+                feedback and hand cursor on all toolbar icons.</li>
             <li>0.13.0 — <b>SFTP &amp; FTP File Browser</b>: full remote file browser supporting
                 SFTP (over active SSH sessions without re-authenticating, or standalone) and FTP.
                 Available alongside the terminal in a split pane, in a dedicated <em>SFTP Browser</em>
