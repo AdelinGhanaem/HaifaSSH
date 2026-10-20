@@ -15,6 +15,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.InplaceButton
 import com.intellij.ui.JBColor
+import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
@@ -70,13 +71,37 @@ class RemoteFileBrowserPanel(
     private val tableModel = RemoteFileTableModel()
     private val table = JBTable(tableModel)
 
+    private var isLocalExplorerOpen: Boolean = false
+    private var localViewMode: LocalViewMode = LocalViewMode.DOCKED_PINNED
+    private var dockPosition: DockPosition = DockPosition.LEFT
+
+    private val centerContainer = JPanel(BorderLayout())
+    private val remoteCenterPanel = JPanel(BorderLayout()).apply {
+        add(JBScrollPane(table), BorderLayout.CENTER)
+    }
+    private val splitter = JBSplitter(false, 0.45f).apply {
+        dividerWidth = JBUI.scale(4)
+    }
+
+    private val localExplorerPanel = LocalFileExplorerPanel(
+        project = project,
+        session = session,
+        onUploadFiles = { files -> uploadLocalFiles(files, currentPath) },
+        onViewModeChanged = { mode -> setLocalViewMode(mode) },
+        onPositionChanged = { pos -> setDockPosition(pos) },
+        onCloseRequested = { toggleLocalExplorer(false) },
+    )
+
+    private var localWindow: LocalFileExplorerWindow? = null
+
     init {
         border = JBUI.Borders.empty()
         setupTable()
         add(buildToolbar(), BorderLayout.NORTH)
-        add(JBScrollPane(table), BorderLayout.CENTER)
+        add(centerContainer, BorderLayout.CENTER)
         add(buildStatusBar(), BorderLayout.SOUTH)
         setupDragAndDrop()
+        updateCenterLayout()
 
         // Initialize path to remote home dir in background
         object : Task.Backgroundable(project, "Connecting file browser", false) {
@@ -100,6 +125,11 @@ class RemoteFileBrowserPanel(
         table.autoCreateRowSorter = true
         table.rowHeight = JBUI.scale(22)
         table.setShowGrid(false)
+
+        // Install SpeedSearch and File Explorer Type-ahead navigation (typing e.g. "Down" jumps to Downloads)
+        FileTableTypeAhead.installOn(table) { modelRow ->
+            tableModel.getFileAt(modelRow)?.name
+        }
 
         // Custom renderers
         table.columnModel.getColumn(0).cellRenderer = object : DefaultTableCellRenderer() {
@@ -209,18 +239,70 @@ class RemoteFileBrowserPanel(
         })
     }
 
-    private var localExplorerWindow: LocalFileExplorerWindow? = null
-
-    private fun openLocalFileExplorer() {
-        var w = localExplorerWindow
+    private fun ensureLocalWindow(): LocalFileExplorerWindow {
+        var w = localWindow
         if (w == null || !w.isDisplayable) {
-            w = LocalFileExplorerWindow(project, session) { filesToUpload ->
-                uploadLocalFiles(filesToUpload, currentPath)
+            w = LocalFileExplorerWindow(project, session, localExplorerPanel) {
+                toggleLocalExplorer(false)
             }
-            localExplorerWindow = w
+            localWindow = w
         }
-        w.isVisible = true
-        w.toFront()
+        return w
+    }
+
+    private fun updateCenterLayout() {
+        centerContainer.removeAll()
+
+        if (!isLocalExplorerOpen) {
+            localWindow?.isVisible = false
+            centerContainer.add(remoteCenterPanel, BorderLayout.CENTER)
+        } else if (localViewMode.isDocked) {
+            localWindow?.isVisible = false
+            splitter.orientation = (dockPosition == DockPosition.UP || dockPosition == DockPosition.DOWN)
+            if (dockPosition == DockPosition.LEFT || dockPosition == DockPosition.UP) {
+                splitter.firstComponent = localExplorerPanel
+                splitter.secondComponent = remoteCenterPanel
+            } else {
+                splitter.firstComponent = remoteCenterPanel
+                splitter.secondComponent = localExplorerPanel
+            }
+            centerContainer.add(splitter, BorderLayout.CENTER)
+        } else {
+            // WINDOW, FLOAT, UNDOCK
+            centerContainer.add(remoteCenterPanel, BorderLayout.CENTER)
+            val win = ensureLocalWindow()
+            win.attachPanel()
+            win.isVisible = true
+            win.toFront()
+        }
+
+        centerContainer.revalidate()
+        centerContainer.repaint()
+    }
+
+    fun toggleLocalExplorer(open: Boolean) {
+        isLocalExplorerOpen = open
+        updateCenterLayout()
+    }
+
+    fun setLocalViewMode(mode: LocalViewMode) {
+        localViewMode = mode
+        if (!isLocalExplorerOpen) {
+            isLocalExplorerOpen = true
+        }
+        updateCenterLayout()
+    }
+
+    fun setDockPosition(pos: DockPosition) {
+        dockPosition = pos
+        if (!localViewMode.isDocked) {
+            localViewMode = LocalViewMode.DOCKED_PINNED
+            localExplorerPanel.setViewMode(LocalViewMode.DOCKED_PINNED)
+        }
+        if (!isLocalExplorerOpen) {
+            isLocalExplorerOpen = true
+        }
+        updateCenterLayout()
     }
 
     private fun createVerticalSeparator(): JSeparator = JSeparator(SwingConstants.VERTICAL).apply {
@@ -270,8 +352,8 @@ class RemoteFileBrowserPanel(
 
             add(createVerticalSeparator())
 
-            add(HoverIconButton("Open Local File Explorer (Drag & Drop files)", AllIcons.Nodes.Desktop) {
-                openLocalFileExplorer()
+            add(HoverIconButton("Toggle Local Files (Side-by-Side)", AllIcons.Nodes.Desktop) {
+                toggleLocalExplorer(!isLocalExplorerOpen)
             })
         }
 
@@ -378,8 +460,8 @@ class RemoteFileBrowserPanel(
         menu.add(JMenuItem("Upload Files Here...", AllIcons.Actions.Upload).apply {
             addActionListener { promptUploadFiles() }
         })
-        menu.add(JMenuItem("Open Local File Explorer...", AllIcons.Nodes.Desktop).apply {
-            addActionListener { openLocalFileExplorer() }
+        menu.add(JMenuItem(if (isLocalExplorerOpen) "Hide Local Files" else "Open Local Files (Side-by-Side)", AllIcons.Nodes.Desktop).apply {
+            addActionListener { toggleLocalExplorer(!isLocalExplorerOpen) }
         })
         menu.add(JMenuItem("New Folder...", AllIcons.Actions.NewFolder).apply {
             addActionListener { promptNewFolder() }
