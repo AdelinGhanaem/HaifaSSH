@@ -50,6 +50,10 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.16.0 — <b>File Explorer Type-Ahead &amp; Navigation Enhancements</b>:
+                support Backspace character editing and Escape cancellation in file explorer type-ahead search
+                without triggering parent directory navigation; dedicated Alt+Up/Cmd+Up, Alt+Left, Alt+Right
+                folder navigation shortcuts; improved focus and directory change lifecycle for search buffers.</li>
             <li>0.15.0 — <b>Side-by-Side Local Filesystem &amp; View Modes</b>:
                 embedded side-by-side local filesystem explorer with drag &amp; drop to remote sessions;
                 IntelliJ terminal-style view modes (Docked Pinned, Docked Unpinned, Window Mode, Float, Undock);
