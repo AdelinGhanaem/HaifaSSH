@@ -23,6 +23,10 @@ class FileTableTypeAhead(
         const val TIMEOUT_MS = 1500L
 
         fun installOn(table: JTable, getFileName: (modelRow: Int) -> String?): FileTableTypeAhead {
+            // Install TableSpeedSearch first so its listeners are registered before ours
+            runCatching {
+                TableSpeedSearch.installOn(table)
+            }
             val listener = FileTableTypeAhead(table, getFileName)
             table.addKeyListener(listener)
             table.addFocusListener(object : java.awt.event.FocusAdapter() {
@@ -30,11 +34,15 @@ class FileTableTypeAhead(
                     listener.clear()
                 }
             })
-            runCatching {
-                TableSpeedSearch.installOn(table)
-            }
             return listener
         }
+    }
+
+    private fun getSpeedSearch(): com.intellij.ui.speedSearch.SpeedSearchSupply? {
+        return runCatching {
+            com.intellij.ui.speedSearch.SpeedSearchSupply.getSupply(table, true)
+                ?: com.intellij.ui.speedSearch.SpeedSearchSupply.getSupply(table)
+        }.getOrNull()
     }
 
     fun hasActiveBuffer(): Boolean {
@@ -50,6 +58,18 @@ class FileTableTypeAhead(
     }
 
     override fun keyPressed(e: KeyEvent) {
+        if (e.isConsumed) return
+
+        val speedSearch = getSpeedSearch()
+        if (speedSearch != null && speedSearch.isPopupActive) {
+            // When IntelliJ's native TableSpeedSearch popup is active on screen,
+            // let TableSpeedSearch handle Backspace/Escape and update its popup text.
+            if (e.keyCode == KeyEvent.VK_BACK_SPACE && buffer.isNotEmpty()) {
+                buffer.deleteCharAt(buffer.length - 1)
+            }
+            return
+        }
+
         when (e.keyCode) {
             KeyEvent.VK_BACK_SPACE -> {
                 val now = System.currentTimeMillis()
@@ -64,9 +84,8 @@ class FileTableTypeAhead(
                         performSearch(buffer.toString().lowercase(), isSingleCharCycle = false)
                     }
                 }
-                // ALWAYS consume Backspace on the file table. In a file table, Backspace
-                // is only used for editing type-ahead search queries, never for destructive
-                // navigation like deleting path segments or jumping to the root folder.
+                // ALWAYS consume Backspace on the file table when speed search popup is not active,
+                // so it never triggers accidental parent directory navigation.
                 e.consume()
             }
             KeyEvent.VK_ESCAPE -> {
@@ -79,11 +98,19 @@ class FileTableTypeAhead(
     }
 
     override fun keyTyped(e: KeyEvent) {
+        if (e.isConsumed) return
+
         val ch = e.keyChar
         if (ch.isISOControl() || e.isMetaDown || e.isControlDown || e.isAltDown) return
 
         // Space only counts if already typing a multi-word name
         if (ch == ' ' && buffer.isEmpty()) return
+
+        val speedSearch = getSpeedSearch()
+        if (speedSearch != null && speedSearch.isPopupActive) {
+            // SpeedSearch popup is already active and handling typing
+            return
+        }
 
         val now = System.currentTimeMillis()
         if (now - lastKeyTime > TIMEOUT_MS) {

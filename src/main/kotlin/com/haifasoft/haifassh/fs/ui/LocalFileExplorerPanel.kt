@@ -447,6 +447,7 @@ class LocalFileExplorerPanel(
         // Keyboard navigation
         table.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
+                if (e.isConsumed) return
                 when (e.keyCode) {
                     KeyEvent.VK_ENTER -> {
                         val selected = getSelectedFiles()
