@@ -1,3 +1,5 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
@@ -20,7 +22,7 @@ dependencies {
     intellijPlatform {
         // Target IntelliJ IDEA Community 2024.2 (build 242). Works in any 2024.2+ JetBrains IDE.
         intellijIdeaCommunity("2024.2")
-        instrumentationTools()
+        testFramework(TestFrameworkType.Platform)
     }
 
     // SSH client — actively maintained drop-in fork of JCraft JSch (same com.jcraft.jsch package).
