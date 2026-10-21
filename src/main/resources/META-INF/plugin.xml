@@ -50,6 +50,9 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li>0.16.1 — <b>SpeedSearch Popup &amp; Backspace Fix</b>:
+                fixed Backspace key event propagation to IntelliJ's native TableSpeedSearch popup,
+                allowing in-place character deletion without leaving search text stuck on screen.</li>
             <li>0.16.0 — <b>File Explorer Type-Ahead &amp; Navigation Enhancements</b>:
                 support Backspace character editing and Escape cancellation in file explorer type-ahead search
                 without triggering parent directory navigation; dedicated Alt+Up/Cmd+Up, Alt+Left, Alt+Right
