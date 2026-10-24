@@ -5,21 +5,33 @@
     <vendor email="a.ganayem@haifasoft.com" url="https://haifasoft.com">HaifaSoft</vendor>
 
     <description><![CDATA[
-        <h2>HaifaSSH — a full SSH session manager, built into your IDE</h2>
+        <h2>HaifaSSH — SSH, SFTP &amp; FTP session manager, built into your IDE</h2>
 
-        <p>Stop juggling a separate terminal app. HaifaSSH brings a fast, organized,
-        multi-tab SSH workflow right into your JetBrains IDE — connect to all your servers
-        from a session tree, open real interactive shells in tabs, and keep every credential
-        safe in the IDE's own encrypted vault. Free and open source.</p>
+        <p>Stop juggling a separate terminal app and FTP client. HaifaSSH brings a fast, organized,
+        multi-tab SSH, SFTP, and FTP workflow right into your JetBrains IDE — connect to all your servers
+        from a session tree, open real interactive shells in tabs, browse and transfer remote files,
+        and keep every credential safe in the IDE's own encrypted vault. Free and open source.</p>
 
         <h3>Why you'll like it</h3>
         <ul>
             <li>🗂️ <b>Organized session tree</b> — group all your servers into folders in the
-                <em>SSH Sessions</em> tool window. Color-code and icon-tag sessions and folders,
-                rename in place with <b>Shift+F6</b>, and type-to-search to jump to any host instantly.</li>
-            <li>💻 <b>Real embedded terminals</b> — double-click a session to open a genuine interactive
+                <em>SSH Sessions</em> tool window. Drag and drop sessions to reorder or move them,
+                color-code and icon-tag items, rename in place with <b>Shift+F6</b>, and type-to-search to jump to any host instantly.</li>
+            <li>💻 <b>Real embedded terminals</b> — double-click an SSH session to open a genuine interactive
                 SSH shell as a tab. Open terminals in the tool window <em>or</em> as full editor tabs,
                 with configurable scrollback for long-running output like <code>tail -f</code>.</li>
+            <li>📁 <b>Embedded SFTP &amp; FTP file browsers</b> — browse remote directories, create folders,
+                rename, delete, and download files directly into your IDE. Double-click SFTP/FTP sessions to jump
+                straight into file browsing, or open a live file panel right beside your terminal.</li>
+            <li>🪟 <b>Side-by-side local explorer &amp; docking</b> — open your local file system side-by-side with
+                remote sessions in a resizable split view. Drag and drop files from your desktop or local explorer
+                directly into remote folders to upload. Choose your docking style: <em>Docked Pinned</em>,
+                <em>Unpinned</em>, or detach into a floating <em>Window Mode</em>.</li>
+            <li>⌨️ <b>Keyboard-driven SpeedSearch</b> — start typing anywhere in the session tree or file tables
+                to instantly jump to matching hosts or files, with full in-place Backspace editing and navigation
+                shortcuts (<code>Alt+Up</code>, <code>Alt+Left/Right</code>).</li>
+            <li>⚡ <b>Terminal assistant panel</b> — companion panel docked alongside your terminal with quick
+                access to host files, executed <b>Command History</b>, and reusable <b>Command Snippets</b>.</li>
             <li>🎨 <b>Terminals that match your theme</b> — ready-made color schemes (Classic Dark,
                 Solarized, Monokai, One Dark, Light), a "Follow IDE Theme" mode, and a fully editable
                 custom scheme (background, foreground, cursor, selection, all 16 ANSI colors).</li>
@@ -29,7 +41,7 @@
             <li>🛡️ <b>Security first</b> — SSH host keys are verified (trust-on-first-use, and it reads
                 your existing <code>~/.ssh/known_hosts</code>). Credential exports are AES-256 encrypted.
                 Weak legacy SHA-1/DSA algorithms are strictly opt-in, per session.</li>
-            <li>⚡ <b>Built for real work</b> — multi-select bulk edits (recolor, re-icon, or delete many
+            <li>🛠️ <b>Built for real work</b> — multi-select bulk edits (recolor, re-icon, or delete many
                 sessions at once), duplicate a session with one click to spin up a near-identical host,
                 and build out your tree with right-click <em>New Session Here</em> / <em>New Subfolder</em>.</li>
             <li>🔁 <b>Import &amp; export</b> — move your sessions between machines, optionally including
