@@ -6,7 +6,6 @@ files, and keep credentials in the IDE Password Safe. Free and open source (MIT)
 
 [![Build](https://github.com/AdelinGhanaem/HaifaSSH/actions/workflows/build.yml/badge.svg)](https://github.com/AdelinGhanaem/HaifaSSH/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Support on Ko-fi](https://img.shields.io/badge/Support-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/adelinghanayem)
 
 > **📚 Documentation:** see [`docs/`](docs/README.md) — the IntelliJ plugin
 > system, how this plugin is implemented, a file-by-file code guide, and a full
@@ -149,10 +148,3 @@ files that are already bundled inside the ZIP).
 
 Host-key verification (trust-on-first-use against a managed `known_hosts`) is
 implemented; see [`docs/04-security-report.md`](docs/04-security-report.md).
-
-## Support
-
-HaifaSSH is free and open source, and always will be. If it saves you time,
-you can say thanks with a coffee — entirely optional:
-
-☕ **[Support HaifaSSH on Ko-fi](https://ko-fi.com/adelinghanayem)**

@@ -64,8 +64,7 @@ On your plugin page → **Edit**:
 - **Screenshots** — upload PNG/JPEG files (the first one becomes the thumbnail).
 - **Video** — upload it to **YouTube** (unlisted is fine) and paste the link; it embeds
   as a playable video. The Marketplace does not host raw video files.
-- **Links** — source repository (GitHub) and the **Ko-fi** donation link
-  (<https://ko-fi.com/adelinghanayem>).
+- **Links** — source repository (GitHub).
 - Verify the description renders correctly.
 
 > Media (screenshots/videos) is **not** part of the zip or `plugin.xml`; it is managed on
