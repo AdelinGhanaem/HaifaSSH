@@ -41,6 +41,7 @@ dependencies {
     implementation("commons-net:commons-net:3.11.1")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.opentest4j:opentest4j:1.3.0")
 }
 
 intellijPlatform {
@@ -61,6 +62,14 @@ kotlin {
 }
 
 tasks {
+    test {
+        testLogging {
+            events("passed", "skipped", "failed", "standardOut", "standardError")
+            showExceptions = true
+            showStackTraces = true
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
+    }
     wrapper {
         gradleVersion = "8.10"
     }

@@ -57,22 +57,24 @@ class HaifaSshPlatformTest : BasePlatformTestCase() {
             File(tempDir, "beta.txt").writeText("World")
             File(tempDir, "nestedDir").mkdirs()
 
-        val panel = LocalFileExplorerPanel(
-            project = project,
-            session = session,
-            onUploadFiles = { /* no-op for test */ }
-        )
+            ApplicationManager.getApplication().invokeAndWait {
+                val panel = LocalFileExplorerPanel(
+                    project = project,
+                    session = session,
+                    onUploadFiles = { /* no-op for test */ }
+                )
 
-        panel.navigateTo(tempDir)
+                panel.navigateTo(tempDir)
 
-        assertEquals("Local view mode defaults to DOCKED_PINNED", LocalViewMode.DOCKED_PINNED, panel.currentViewMode)
-        assertEquals("Local dock position defaults to LEFT", DockPosition.LEFT, panel.currentPosition)
+                assertEquals("Local view mode defaults to DOCKED_PINNED", LocalViewMode.DOCKED_PINNED, panel.currentViewMode)
+                assertEquals("Local dock position defaults to LEFT", DockPosition.LEFT, panel.currentPosition)
 
-        panel.setViewMode(LocalViewMode.WINDOW)
-        assertEquals(LocalViewMode.WINDOW, panel.currentViewMode)
+                panel.setViewMode(LocalViewMode.WINDOW)
+                assertEquals(LocalViewMode.WINDOW, panel.currentViewMode)
 
-        panel.setDockPosition(DockPosition.RIGHT)
-        assertEquals(DockPosition.RIGHT, panel.currentPosition)
+                panel.setDockPosition(DockPosition.RIGHT)
+                assertEquals(DockPosition.RIGHT, panel.currentPosition)
+            }
         } finally {
             tempDir.deleteRecursively()
         }
