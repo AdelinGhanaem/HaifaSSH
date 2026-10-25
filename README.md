@@ -6,6 +6,7 @@ files, and keep credentials in the IDE Password Safe. Free and open source (MIT)
 
 [![Build](https://github.com/AdelinGhanaem/HaifaSSH/actions/workflows/build.yml/badge.svg)](https://github.com/AdelinGhanaem/HaifaSSH/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Built by HaifaSoft](https://img.shields.io/badge/Built%20by-HaifaSoft-0b1222)](https://haifasoft.com/)
 
 > **📚 Documentation:** see [`docs/`](docs/README.md) — the IntelliJ plugin
 > system, how this plugin is implemented, a file-by-file code guide, and a full
@@ -148,3 +149,18 @@ files that are already bundled inside the ZIP).
 
 Host-key verification (trust-on-first-use against a managed `known_hosts`) is
 implemented; see [`docs/04-security-report.md`](docs/04-security-report.md).
+
+## About HaifaSoft
+
+HaifaSSH is built and maintained by **[HaifaSoft](https://haifasoft.com/)** — engineer-led software development, multiplied by AI.
+
+We partner directly with businesses to transform ideas and complex requirements into production-ready software solutions without agency overhead or middle layers:
+
+- 🚀 **Full-Stack & Mobile Development** — scalable web and mobile applications from design to production.
+- 🤖 **Agentic & AI Solutions** — production-grade AI agents, LLM integrations, and automated engineering pipelines.
+- ☁️ **Cloud, Data & DevOps** — cloud-native architecture (AWS/GCP), streaming/data platforms, and CI/CD automation.
+- 🛠️ **Custom Developer Tooling** — high-performance IDE plugins, internal developer tools, and system utilities.
+
+Need engineering firepower, architectural guidance, or custom tooling for your team?  
+👉 **[Visit haifasoft.com](https://haifasoft.com/)** or reach out directly at **[contact@haifasoft.com](mailto:contact@haifasoft.com)**.
+

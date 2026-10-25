@@ -51,6 +51,10 @@
         <p>Works in IntelliJ IDEA and other JetBrains IDEs (2024.2+). No account, no telemetry —
         your sessions and secrets stay on your machine.</p>
 
+        <p><b>Built and backed by <a href="https://haifasoft.com/">HaifaSoft</a></b> — engineer-led software
+        development, multiplied by AI. Need custom engineering, architecture, or internal developer
+        tooling? Visit <a href="https://haifasoft.com/">haifasoft.com</a>.</p>
+
         <p style="font-size:0.9em;color:#888;">HaifaSSH is an independent community plugin and is not
         affiliated with or endorsed by JetBrains. All product names and trademarks are the property of
         their respective owners.</p>
