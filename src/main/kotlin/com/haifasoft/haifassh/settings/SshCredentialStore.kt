@@ -13,7 +13,7 @@ object SshCredentialStore {
     private const val SUBSYSTEM = "HaifaSSH"
 
     private fun attributes(key: String): CredentialAttributes =
-        CredentialAttributes(generateServiceName(SUBSYSTEM, key))
+        CredentialAttributesCompat.of(generateServiceName(SUBSYSTEM, key))
 
     private fun passwordKey(sessionId: String) = "$sessionId/password"
     private fun passphraseKey(sessionId: String) = "$sessionId/passphrase"

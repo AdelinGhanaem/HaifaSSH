@@ -4,8 +4,11 @@ import com.haifasoft.haifassh.model.SessionProtocol
 import com.haifasoft.haifassh.model.SshSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.io.IOException
 
 class RemoteFileTest {
 
@@ -50,5 +53,23 @@ class RemoteFileTest {
     fun testGigabyteFormattedSize() {
         val largeFile = RemoteFile("disk.iso", "/data/disk.iso", isDirectory = false, size = 3L * 1024 * 1024 * 1024, permissions = "r--------", lastModified = 0L)
         assertEquals("3.0 GB", largeFile.formattedSize())
+    }
+
+    @Test
+    fun testLocalTargetRejectsServerSuppliedTraversal() {
+        val dir = File("downloads")
+        for (name in listOf("../.bashrc", "../../.ssh/authorized_keys", "/etc/passwd", "a\\..\\b", "..", ".", "", "a\u0000b")) {
+            val file = RemoteFile(name, "/srv/$name", isDirectory = false, size = 1, permissions = "rw-r--r--", lastModified = 0L)
+            assertThrows(IOException::class.java) { file.localTargetIn(dir) }
+        }
+    }
+
+    @Test
+    fun testLocalTargetAcceptsPlainNames() {
+        val dir = File("downloads")
+        for (name in listOf("report.txt", ".env", "..hidden", "with space.log")) {
+            val file = RemoteFile(name, "/srv/$name", isDirectory = false, size = 1, permissions = "rw-r--r--", lastModified = 0L)
+            assertEquals(File(dir, name), file.localTargetIn(dir))
+        }
     }
 }

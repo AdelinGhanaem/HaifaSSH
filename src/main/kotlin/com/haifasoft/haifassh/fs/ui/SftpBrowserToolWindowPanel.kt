@@ -8,7 +8,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.InplaceButton
-import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.ui.JBUI
@@ -17,6 +16,7 @@ import com.haifasoft.haifassh.fs.RemoteFileManager
 import com.haifasoft.haifassh.fs.RemoteFileSystem
 import com.haifasoft.haifassh.fs.ftp.FtpFileSystem
 import com.haifasoft.haifassh.fs.sftp.SftpFileSystem
+import com.haifasoft.haifassh.ui.textRenderer
 import com.haifasoft.haifassh.model.SessionProtocol
 import com.haifasoft.haifassh.model.SshSession
 import com.haifasoft.haifassh.settings.SshCredentialStore
@@ -40,7 +40,7 @@ class SftpBrowserToolWindowPanel(
 ) : JBPanel<SftpBrowserToolWindowPanel>(BorderLayout()) {
 
     private val sessionCombo = ComboBox<SshSession>().apply {
-        renderer = SimpleListCellRenderer.create("<No Sessions Configured>") { it?.displayName().orEmpty() }
+        renderer = textRenderer("<No Sessions Configured>") { it.displayName() }
     }
     private val connectBtn = HoverIconButton("Connect to Session", AllIcons.Actions.Execute) { connectCurrentSession() }
     private val disconnectBtn = HoverIconButton("Disconnect Session", AllIcons.Actions.Suspend) { disconnectCurrent() }.apply { isEnabled = false }

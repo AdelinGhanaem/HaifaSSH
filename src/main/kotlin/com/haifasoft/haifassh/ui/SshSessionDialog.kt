@@ -1,7 +1,6 @@
 package com.haifasoft.haifassh.ui
 
 import com.haifasoft.haifassh.model.SessionProtocol
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -25,6 +24,7 @@ import com.haifasoft.haifassh.settings.SshSessionService
 import java.awt.FlowLayout
 import javax.swing.JButton
 import javax.swing.JComponent
+import javax.swing.JList
 import javax.swing.JPanel
 
 /**
@@ -47,12 +47,11 @@ class SshSessionDialog(
     private val nameField = JBTextField(session.name)
     private val protocolCombo = ComboBox(arrayOf(SessionProtocol.SSH, SessionProtocol.SFTP, SessionProtocol.FTP)).apply {
         selectedItem = session.protocol
-        renderer = SimpleListCellRenderer.create("") { protocol ->
+        renderer = textRenderer { protocol: SessionProtocol ->
             when (protocol) {
                 SessionProtocol.SSH -> "SSH (Terminal & SFTP)"
                 SessionProtocol.SFTP -> "SFTP (File Browser)"
                 SessionProtocol.FTP -> "FTP (File Browser)"
-                else -> protocol?.name ?: ""
             }
         }
     }
@@ -61,7 +60,7 @@ class SshSessionDialog(
     private val usernameField = JBTextField(session.username)
     private val authCombo = ComboBox(arrayOf(SshAuthType.PASSWORD, SshAuthType.KEY)).apply {
         selectedItem = session.authType
-        renderer = SimpleListCellRenderer.create("") { JumpHostDialog.authLabel(it) }
+        renderer = textRenderer { JumpHostDialog.authLabel(it) }
     }
     private val keyPathField = TextFieldWithBrowseButton().apply { text = session.privateKeyPath }
     private val passwordField = JBPasswordField()
@@ -77,9 +76,17 @@ class SshSessionDialog(
 
     private val iconCombo = ComboBox(SessionIcons.choices.toTypedArray()).apply {
         selectedItem = SessionIcons.choice(session.iconKey)
-        renderer = SimpleListCellRenderer.create<SessionIcons.Choice> { label, value, _ ->
-            label.text = value?.label ?: ""
-            label.icon = value?.icon
+        renderer = object : SimpleListCellRenderer<SessionIcons.Choice>() {
+            override fun customize(
+                list: JList<out SessionIcons.Choice>,
+                value: SessionIcons.Choice?,
+                index: Int,
+                selected: Boolean,
+                hasFocus: Boolean,
+            ) {
+                text = value?.label ?: ""
+                icon = value?.icon
+            }
         }
     }
     private val colorPanel = ColorPanel().apply {
@@ -91,7 +98,7 @@ class SshSessionDialog(
 
     private val jumpModel = CollectionListModel<JumpHostEntry>()
     private val jumpList = JBList(jumpModel).apply {
-        cellRenderer = SimpleListCellRenderer.create("<no jump hosts>") { it.label() }
+        cellRenderer = textRenderer("<no jump hosts>") { it.label() }
         visibleRowCount = 4
     }
 
@@ -102,11 +109,11 @@ class SshSessionDialog(
             else -> "Edit SSH Session"
         }
 
-        keyPathField.addBrowseFolderListener(
+        installFileBrowser(
+            keyPathField,
+            project,
             "Select Private Key",
             "Choose the private key file for this session",
-            project,
-            FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor(),
         )
 
         // Where to read existing secrets from: an explicit source (Duplicate) or,
@@ -255,8 +262,8 @@ class SshSessionDialog(
                 store.setPassword(saved.id, String(pw).takeIf { saved.authType == SshAuthType.PASSWORD })
                 store.setPassphrase(saved.id, String(pp).takeIf { saved.authType == SshAuthType.KEY })
             } finally {
-                pw.fill(' ')
-                pp.fill(' ')
+                pw.fill('\u0000')
+                pp.fill('\u0000')
             }
         } else {
             store.setPassword(saved.id, null)

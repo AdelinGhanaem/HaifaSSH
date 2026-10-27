@@ -1,6 +1,5 @@
 package com.haifasoft.haifassh.ui
 
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -55,16 +54,11 @@ class JumpHostDialog(
 
     init {
         title = if (isNew) "Add Jump Host" else "Edit Jump Host"
-        // NB: the non-deprecated addBrowseFolderListener(project, descriptor) overload only
-        // exists in 2024.3+. Since we support 2024.2 (since-build 242), we keep this deprecated
-        // 4-arg form — it is merely scheduled-for-removal (a warning) and works on every
-        // supported IDE. Revisit if the minimum supported build is ever raised.
-        @Suppress("DEPRECATION")
-        keyPathField.addBrowseFolderListener(
+        installFileBrowser(
+            keyPathField,
+            project,
             "Select Private Key",
             "Choose the private key file for this jump host",
-            project,
-            FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor(),
         )
         authCombo.addActionListener { updateAuthFields() }
         init()

@@ -2,6 +2,7 @@ package com.haifasoft.haifassh.settings
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
+import com.intellij.openapi.components.RoamingType
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
@@ -37,7 +38,12 @@ class CommandHistoryState {
  * IDE restarts.
  */
 @Service(Service.Level.APP)
-@State(name = "HaifaSshCommandHistory", storages = [Storage("haifassh-command-history.xml")])
+// Not roamable: typed commands can carry hostnames, tokens or inline secrets, so they must
+// stay on this machine rather than travel through Settings Sync.
+@State(
+    name = "HaifaSshCommandHistory",
+    storages = [Storage("haifassh-command-history.xml", roamingType = RoamingType.DISABLED)],
+)
 class SshCommandHistoryService : PersistentStateComponent<CommandHistoryState> {
 
     private var state = CommandHistoryState()

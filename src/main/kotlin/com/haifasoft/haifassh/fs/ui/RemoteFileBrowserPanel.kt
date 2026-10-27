@@ -5,6 +5,7 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.fileChooser.FileChooserFactory
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -41,6 +42,7 @@ import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import javax.swing.JMenuItem
@@ -533,9 +535,7 @@ class RemoteFileBrowserPanel(
             })
         }
 
-        @Suppress("DEPRECATION")
-        val pasteIcon = AllIcons.Actions.Menu_paste
-        menu.add(JMenuItem("Paste", pasteIcon).apply {
+        menu.add(JMenuItem("Paste", AllIcons.Actions.MenuPaste).apply {
             isEnabled = canPaste()
             addActionListener { pasteClipboard() }
         })
@@ -758,8 +758,7 @@ class RemoteFileBrowserPanel(
                         if (indicator.isCanceled) break
                         indicator.text = "Downloading ${file.name} (${index + 1}/${files.size})"
                         indicator.fraction = index.toDouble() / files.size.toDouble()
-                        val destination = File(targetDir, file.name)
-                        fs.download(file.path, destination) { _, _ -> }
+                        fs.download(file.path, file.localTargetIn(targetDir)) { _, _ -> }
                     }
                 }
 
@@ -820,8 +819,12 @@ class RemoteFileBrowserPanel(
         val chooser = FileChooserFactory.getInstance().createFileChooser(descriptor, project, this)
         val selected = chooser.choose(project)
         if (selected.isNotEmpty()) {
-            val targetDir = File(selected[0].path)
-            val destination = File(targetDir, file.name)
+            val destination = try {
+                file.localTargetIn(File(selected[0].path))
+            } catch (e: IOException) {
+                notifyError(e.message ?: "Unsafe file name")
+                return
+            }
             downloadFileTo(file, destination)
         }
     }
@@ -849,9 +852,16 @@ class RemoteFileBrowserPanel(
     }
 
     private fun downloadAndOpenFile(file: RemoteFile) {
-        val tempDir = File(System.getProperty("java.io.tmpdir"), "haifassh_${session.id}")
+        // Under the IDE's per-user system dir rather than the shared java.io.tmpdir, where
+        // (on Linux) another local user could pre-create the folder or plant a symlink.
+        val tempDir = File(PathManager.getSystemPath(), "haifassh/downloads/${session.id}")
         tempDir.mkdirs()
-        val tempFile = File(tempDir, file.name)
+        val tempFile = try {
+            file.localTargetIn(tempDir)
+        } catch (e: IOException) {
+            notifyError(e.message ?: "Unsafe file name")
+            return
+        }
         downloadFileTo(file, tempFile) { downloaded ->
             ApplicationManager.getApplication().invokeLater {
                 val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(downloaded)
@@ -934,7 +944,7 @@ class RemoteFileBrowserPanel(
                     }
                     val defaultDest = normalizeRemotePath(targetDir, tempFile.name)
                     if (defaultDest != targetPath) {
-                        runCatching { fs.rename(normalizeRemotePath(targetDir, source.name), targetPath) }
+                        fs.rename(defaultDest, targetPath)
                     }
                 } finally {
                     tempFile.delete()
